@@ -1,11 +1,12 @@
 # MemBench v0.1 — Phased Implementation Plan
 
-Solo builder, part-time, 4–6 weeks to v0.1. Each phase = one reviewable PR with explicit "done when" criteria. Everything runs offline except the optional LLM-judge (Claude via Anthropic API).
+Solo builder, part-time, 4–6 weeks to v0.1. Each phase = one reviewable PR with explicit "done when" criteria. Everything runs offline except the optional LLM-judge (provider-agnostic; Claude by default).
 
 ## Guiding constraints
 
 - **Stack:** Python. CLI via Typer (or Click). Packaged for PyPI.
-- **Scoring:** hybrid. Deterministic where possible (latency, token counts, exact-fact assertions); LLM-judge (Claude) for semantic recall and contradiction. Judge calls are cached and seedable for CI reproducibility.
+- **Scoring:** hybrid. Deterministic where possible (latency, token counts, exact-fact assertions); LLM-judge for semantic recall and contradiction. Judge calls are cached and seedable for CI reproducibility.
+- **Judge is pluggable:** mirrors the backend-adapter pattern. Users pick any frontier model via model name + base URL + API key (Anthropic, OpenAI, Gemini, or any OpenAI-compatible endpoint). Default: Claude.
 - **Adapter budget:** a new backend adapter must fit in <100 lines. Keep the interface thin; push shared logic into the runner, not the adapters.
 - **Offline-first:** Phase 1 has no memory-vendor dependency. Full-context and Chroma baselines only.
 
@@ -18,7 +19,7 @@ membench/
     adapter.py      # MemoryAdapter ABC + Event/RecallResult types
     runner.py       # replays a pack against an adapter, collects traces
     registry.py     # name -> adapter class discovery
-    scoring/        # one module per metric + judge client
+    scoring/        # one module per metric + pluggable Judge interface
     report/         # json, markdown, html emitters
   adapters/
     full_context.py # baseline: append-all, recall returns whole log
@@ -47,6 +48,14 @@ class MemoryAdapter(ABC):
 - **Event:** `{ session_id, key, role, content, timestamp, metadata }`. `key` is a stable id so `forget` and update-correctness checks can target a specific fact.
 - **RecallResult:** `{ context: str, items: list, token_count: int }`. `context` is exactly what would be injected into a prompt — this is what the token-cost metric measures.
 - Adapters are stateless config wrappers over a backend client; construction takes a plain dict from pack/CLI config. No scoring logic inside adapters.
+
+## Judge interface contract
+
+Same pattern as backend adapters: the judge is pluggable behind a small `Judge` interface (`score(rubric, evidence) -> verdict`), configured by three values — model name, base URL, API key.
+
+- Config via CLI flags / env vars: `--judge-model`, `--judge-base-url`, key via `MEMBENCH_JUDGE_API_KEY`.
+- Works with Anthropic, OpenAI, Gemini, or any OpenAI-compatible endpoint; default is Claude.
+- Recommended implementation: two thin clients behind the interface — one OpenAI-compatible (covers OpenAI, Gemini, most gateways) plus the `anthropic` SDK. Avoids a heavyweight dep like LiteLLM for what is one structured-scoring call.
 
 ## Scenario pack format (descriptive)
 
@@ -91,11 +100,12 @@ class MemoryAdapter(ABC):
 
 ## Phase 3 — LLM-judge + reproducibility
 
-**Goal:** add semantic recall and contradiction-rate metrics via a cached, deterministic Claude judge.
+**Goal:** add semantic recall and contradiction-rate metrics via a cached, deterministic, provider-agnostic judge.
 
 **Deliverables**
-- `core/scoring/judge.py`: Anthropic client, structured rubric prompts, fixed model + temperature 0.
-- On-disk response cache keyed by (prompt hash, model) so CI replays without API calls.
+- `core/scoring/judge.py`: `Judge` interface + two thin clients (OpenAI-compatible, Anthropic); structured rubric prompts, temperature 0. Default model: Claude.
+- Judge config: `--judge-model`, `--judge-base-url`, `MEMBENCH_JUDGE_API_KEY` env var.
+- On-disk response cache keyed by (prompt hash, judge model) — so scores from different judges are never silently compared; CI replays without API calls.
 - `contradiction rate` + judge-scored semantic recall metrics.
 - CLI flags: `--judge/--no-judge`, `--judge-cache`; graceful skip when no API key.
 
@@ -103,6 +113,7 @@ class MemoryAdapter(ABC):
 - With `--no-judge` everything runs offline; with judge + populated cache, CI is deterministic and network-free.
 - All five metrics appear in the JSON scorecard.
 - Cache hit produces identical scores across two runs (reproducibility test).
+- Pointing `--judge-model`/`--judge-base-url` at an OpenAI-compatible endpoint works without code changes.
 
 ## Phase 4 — Reports + scenario packs
 
@@ -137,7 +148,7 @@ class MemoryAdapter(ABC):
 **Goal:** "bring your own transcripts" — LLM-assisted pack creation.
 
 **Deliverables**
-- `generate/`: transcript loader → Claude prompt → draft pack (facts, updates, contradictions, queries) → schema-valid YAML.
+- `generate/`: transcript loader → LLM prompt (reuses the judge's provider-agnostic client config) → draft pack (facts, updates, contradictions, queries) → schema-valid YAML.
 - `cli.py`: `membench generate --transcripts <path> --out pack.yaml`.
 - Validation pass so generated packs load in the runner unedited.
 
@@ -167,4 +178,4 @@ class MemoryAdapter(ABC):
 - Phases 1–4 need no API keys or vendor accounts — the offline core is fully testable first.
 - Judge (Phase 3) lands before real packs (Phase 4) so packs are authored against all five metrics.
 - Mem0 (Phase 5) is deliberately late: the interface and scoring are frozen by then, so it stress-tests the <100-line goal rather than driving the design.
-- Reproducibility (judge cache, temperature 0, fixed model, seeds) is a Phase 3 acceptance gate, not an afterthought.
+- Reproducibility (per-model judge cache, temperature 0, pinned judge model, seeds) is a Phase 3 acceptance gate, not an afterthought.
