@@ -1,0 +1,131 @@
+name: coding_assistant
+description: >
+  An AI coding assistant remembering project conventions and decisions for
+  the "Atlas" service across three working sessions: initial conventions,
+  a switch of API base URL and ORM, and a later correction of the
+  indentation style. Exercises state / update / contradict writes and both
+  deterministic (expect_contains / expect_key) and judge-scored queries.
+
+steps:
+  # --- Session d1: establish project conventions ---
+  - type: write
+    session_id: d1
+    key: conv_indent
+    role: user
+    content: "For this project we use tabs for indentation, not spaces."
+    fact_type: state
+
+  - type: write
+    session_id: d1
+    key: conv_api_url
+    role: user
+    content: "The API base URL for Atlas is https://api.atlas.dev/v1."
+    fact_type: state
+
+  - type: write
+    session_id: d1
+    key: conv_orm
+    role: user
+    content: "We use SQLAlchemy as the ORM for database access."
+    fact_type: state
+
+  - type: write
+    session_id: d1
+    key: conv_test
+    role: user
+    content: "All new code must ship with pytest unit tests."
+    fact_type: state
+
+  - type: query
+    session_id: d1
+    query: "What indentation style does this project use?"
+    expect_contains: ["tabs"]
+    expect_key: conv_indent
+
+  - type: query
+    session_id: d1
+    query: "Which ORM does the project use?"
+    expect_contains: ["SQLAlchemy"]
+    expect_key: conv_orm
+
+  # --- Session d2: decisions change (API URL update + ORM switch) ---
+  - type: write
+    session_id: d2
+    key: conv_api_url
+    role: user
+    content: "We migrated the API — the base URL is now https://api.atlas.io/v2."
+    fact_type: update
+
+  - type: write
+    session_id: d2
+    key: conv_orm
+    role: user
+    content: "Decision: we're switching from SQLAlchemy to Tortoise ORM for async support."
+    fact_type: update
+
+  - type: write
+    session_id: d2
+    key: conv_lint
+    role: user
+    content: "We now enforce ruff for linting on every commit."
+    fact_type: state
+
+  - type: query
+    session_id: d2
+    query: "What is the current API base URL?"
+    expect_contains: ["api.atlas.io/v2"]
+    expect_key: conv_api_url
+
+  - type: query
+    session_id: d2
+    query: "Which ORM should new code use now?"
+    expect_contains: ["Tortoise"]
+    expect_key: conv_orm
+    judge:
+      semantic_recall: "The evidence indicates the project now uses the Tortoise ORM."
+      contradiction: >
+        The evidence names more than one current ORM for the project at the
+        same time, without indicating one superseded the other.
+
+  # --- Session d3: correct an earlier convention ---
+  - type: write
+    session_id: d3
+    key: conv_indent
+    role: user
+    content: "Correction: we actually use 4 spaces for indentation, never tabs."
+    fact_type: contradict
+
+  - type: write
+    session_id: d3
+    key: conv_pyver
+    role: user
+    content: "The project targets Python 3.11 as the minimum version."
+    fact_type: state
+
+  - type: query
+    session_id: d3
+    query: "What indentation style should be used now?"
+    expect_contains: ["spaces"]
+    expect_key: conv_indent
+    judge:
+      semantic_recall: "The evidence indicates the project uses spaces for indentation."
+      contradiction: >
+        The evidence contains contradictory indentation conventions, stating
+        both tabs and spaces as the current style.
+
+  - type: query
+    session_id: d3
+    query: "What is the minimum supported Python version?"
+    expect_contains: ["3.11"]
+    expect_key: conv_pyver
+
+  - type: query
+    session_id: d3
+    query: "What are the current tooling and convention decisions for the project?"
+    judge:
+      semantic_recall: >
+        The evidence indicates the project uses ruff for linting and requires
+        pytest tests.
+      contradiction: >
+        The evidence names conflicting current values for the same convention
+        without indicating which one supersedes the other.

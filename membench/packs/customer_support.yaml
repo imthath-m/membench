@@ -1,0 +1,126 @@
+name: customer_support
+description: >
+  A support agent remembering a customer (Dana Whitfield) across three
+  tickets: initial contact and profile, a plan upgrade with a corrected
+  order number, and a later shipping-address change plus contact
+  preference. Exercises state / update / contradict writes and both
+  deterministic (expect_contains / expect_key) and judge-scored queries.
+
+steps:
+  # --- Ticket 1 (session t1): first contact, build the profile ---
+  - type: write
+    session_id: t1
+    key: fact_name
+    role: user
+    content: "Hi, my name is Dana Whitfield."
+    fact_type: state
+
+  - type: write
+    session_id: t1
+    key: fact_email
+    role: user
+    content: "You can reach me at dana.whitfield@example.com."
+    fact_type: state
+
+  - type: write
+    session_id: t1
+    key: fact_plan
+    role: user
+    content: "I'm currently on the Basic plan."
+    fact_type: state
+
+  - type: write
+    session_id: t1
+    key: fact_order
+    role: user
+    content: "I'm calling about order number ORD-4471."
+    fact_type: state
+
+  - type: query
+    session_id: t1
+    query: "What is the customer's name?"
+    expect_contains: ["Dana"]
+    expect_key: fact_name
+
+  - type: query
+    session_id: t1
+    query: "Which subscription plan is the customer on?"
+    expect_contains: ["Basic"]
+    expect_key: fact_plan
+
+  # --- Ticket 2 (session t2): plan upgrade + corrected order number ---
+  - type: write
+    session_id: t2
+    key: fact_plan
+    role: user
+    content: "I'd like to upgrade to the Pro plan, effective today."
+    fact_type: update
+
+  - type: write
+    session_id: t2
+    key: fact_address
+    role: user
+    content: "Please ship to 22 Elm Street, Portland, OR 97201."
+    fact_type: state
+
+  - type: write
+    session_id: t2
+    key: fact_order
+    role: user
+    content: "Actually I gave the wrong number earlier — my order is ORD-7788, not ORD-4471."
+    fact_type: contradict
+
+  - type: query
+    session_id: t2
+    query: "Which subscription plan is the customer on now?"
+    expect_contains: ["Pro"]
+    expect_key: fact_plan
+
+  - type: query
+    session_id: t2
+    query: "What is the customer's correct order number?"
+    expect_contains: ["ORD-7788"]
+    expect_key: fact_order
+    judge:
+      semantic_recall: "The evidence indicates the customer's correct order number is ORD-7788."
+      contradiction: >
+        The evidence contains contradictory order numbers, naming more than
+        one different order number for the same customer.
+
+  # --- Ticket 3 (session t3): shipping change + contact preference ---
+  - type: write
+    session_id: t3
+    key: fact_pref
+    role: user
+    content: "Going forward I prefer to be contacted by email rather than phone."
+    fact_type: state
+
+  - type: write
+    session_id: t3
+    key: fact_address
+    role: user
+    content: "I've moved — please update shipping to 90 Oak Avenue, Seattle, WA 98101."
+    fact_type: update
+
+  - type: query
+    session_id: t3
+    query: "What is the customer's current shipping address?"
+    expect_contains: ["Oak Avenue", "Seattle"]
+    expect_key: fact_address
+
+  - type: query
+    session_id: t3
+    query: "How does the customer prefer to be contacted?"
+    expect_contains: ["email"]
+    expect_key: fact_pref
+
+  - type: query
+    session_id: t3
+    query: "Summarize the customer's plan history."
+    judge:
+      semantic_recall: >
+        The evidence indicates the customer moved from the Basic plan to the
+        Pro plan.
+      contradiction: >
+        The evidence names more than one current plan for the customer at the
+        same time, without indicating one superseded the other.
