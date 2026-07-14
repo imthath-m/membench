@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
 
 from membench.core.registry import get_adapter_class, list_backends
+from membench.core.report.html import render_html
 from membench.core.report.json import write_json
+from membench.core.report.markdown import render_markdown
 from membench.core.runner import run_pack
 from membench.core.scoring.judge import API_KEY_ENV, DEFAULT_JUDGE_MODEL, build_judge
 from membench.packs.schema import PackValidationError, builtin_pack_path, load_pack
@@ -81,6 +84,54 @@ def run(
     result = run_pack(loaded_pack, adapter, backend_name=backend, judge=judge_obj)
     write_json(result, out)
     typer.echo(f"Wrote report for pack={loaded_pack.name!r} backend={backend!r} to {out}")
+
+
+_RENDERERS = {"md": render_markdown, "html": render_html}
+
+
+@app.command()
+def report(
+    in_paths: list[Path] = typer.Option(
+        ..., "--in", help="JSON report file(s) to render. Repeat --in for a comparison."
+    ),
+    format: str = typer.Option(
+        "md", "--format", help="Output format: 'md' or 'html'."
+    ),
+    out: Path = typer.Option(..., "--out", help="Path to write the rendered report to."),
+) -> None:
+    """Render one or more JSON reports as a Markdown or HTML scorecard."""
+    renderer = _RENDERERS.get(format)
+    if renderer is None:
+        typer.echo(
+            f"Error: unknown format {format!r} (expected one of {sorted(_RENDERERS)})",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        reports = [json.loads(p.read_text()) for p in in_paths]
+    except (OSError, json.JSONDecodeError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    out.write_text(renderer(reports))
+    typer.echo(f"Wrote {format} report from {len(reports)} run(s) to {out}")
+
+
+def _builtin_pack_names() -> list[str]:
+    packs_dir = Path(__file__).parent / "packs"
+    return sorted(p.stem for p in packs_dir.glob("*.yaml"))
+
+
+@app.command(name="list")
+def list_() -> None:
+    """List available builtin packs and backend adapters."""
+    typer.echo("Packs:")
+    for name in _builtin_pack_names():
+        typer.echo(f"  {name}")
+    typer.echo("Backends:")
+    for name in list_backends():
+        typer.echo(f"  {name}")
 
 
 if __name__ == "__main__":
