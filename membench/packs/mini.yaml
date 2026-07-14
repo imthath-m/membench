@@ -36,6 +36,11 @@ steps:
     query: "What is my favorite color now?"
     expect_contains: ["green"]
     expect_key: fact_color
+    judge:
+      semantic_recall: "The evidence indicates the user's current favorite color is green."
+      contradiction: >
+        The evidence contains contradictory statements about the user's
+        favorite color, naming more than one different favorite color.
 
   - type: query
     session_id: s2

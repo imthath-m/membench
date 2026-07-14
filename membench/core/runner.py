@@ -35,8 +35,14 @@ class RunResult:
     scores: dict[str, Any] = field(default_factory=dict)
 
 
-def run_pack(pack: Pack, adapter: MemoryAdapter, backend_name: str) -> RunResult:
-    """Replay every step in `pack` against `adapter` in order."""
+def run_pack(
+    pack: Pack, adapter: MemoryAdapter, backend_name: str, judge: Any = None
+) -> RunResult:
+    """Replay every step in `pack` against `adapter` in order.
+
+    `judge` is an optional `core.scoring.judge.Judge`; when None the judge
+    metrics score as None.
+    """
     started_at = datetime.now(timezone.utc).isoformat()
     traces: list[StepTrace] = []
 
@@ -95,5 +101,5 @@ def run_pack(pack: Pack, adapter: MemoryAdapter, backend_name: str) -> RunResult
         started_at=started_at,
         finished_at=finished_at,
         traces=traces,
-        scores=score_run(pack, traces),
+        scores=score_run(pack, traces, judge),
     )
