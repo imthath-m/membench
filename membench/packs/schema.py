@@ -1,10 +1,12 @@
 """YAML scenario pack loader + validation.
 
 A pack is an ordered list of steps. Each step is either:
-  - a `write`: state / update / contradict a fact.
-  - a `query`: ask a question, with expected-fact assertions and metric
-    hooks. Assertion *scoring* lands in Phase 2 — this schema only
-    carries the fields so packs can be authored against them now.
+  - a `write`: state / update / contradict a fact. `fact_type` of
+    "update" or "contradict" marks that this write supersedes a prior
+    fact under the same `key` — `core.scoring.update_correctness` uses
+    this to find queries that should reflect the new value.
+  - a `query`: ask a question, with expected-fact assertions
+    (`expect_contains`, `expect_key`) scored by `core.scoring`.
 """
 
 from __future__ import annotations

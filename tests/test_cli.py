@@ -19,7 +19,7 @@ def test_run_full_context_writes_valid_json_report(tmp_path):
     data = json.loads(out_path.read_text())
     assert data["pack_name"] == "mini"
     assert data["backend_name"] == "full-context"
-    assert len(data["traces"]) == 6
+    assert len(data["traces"]) == 8
 
 
 def test_run_unknown_backend_fails_cleanly(tmp_path):

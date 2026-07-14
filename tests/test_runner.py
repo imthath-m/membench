@@ -14,7 +14,7 @@ def test_run_pack_produces_a_trace_per_step():
     assert result.backend_name == "full-context"
     assert len(result.traces) == len(pack.steps)
     assert all(isinstance(t, StepTrace) for t in result.traces)
-    assert result.scores == {}
+    assert result.scores  # Phase 2: populated, not the Phase 1 stub
 
 
 def test_query_traces_carry_latency_and_tokens():
@@ -24,7 +24,7 @@ def test_query_traces_carry_latency_and_tokens():
     result = run_pack(pack, adapter, backend_name="full-context")
     query_traces = [t for t in result.traces if t.step_type == "query"]
 
-    assert len(query_traces) == 3
+    assert len(query_traces) == 4
     for trace in query_traces:
         assert trace.latency_ms >= 0
         assert "token_count" in trace.detail
@@ -36,6 +36,9 @@ def test_full_context_recalls_updated_fact():
     adapter = FullContextAdapter()
 
     result = run_pack(pack, adapter, backend_name="full-context")
-    last_query = [t for t in result.traces if t.step_type == "query"][-2]
+    query_traces = [t for t in result.traces if t.step_type == "query"]
+    color_update_query = next(
+        t for t in query_traces if "green" in t.detail["expect_contains"]
+    )
 
-    assert "green" in last_query.detail["context"]
+    assert "green" in color_update_query.detail["context"]
