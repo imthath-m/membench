@@ -38,6 +38,19 @@ class WriteStep:
 
 
 @dataclass
+class JudgeSpec:
+    """LLM-judge expectations on a query step (both fields optional).
+
+    `semantic_recall` is a rubric describing what a correct recall should
+    convey; `contradiction` is a rubric describing what would count as a
+    contradiction in the recalled context. Each drives the like-named metric.
+    """
+
+    semantic_recall: str | None = None
+    contradiction: str | None = None
+
+
+@dataclass
 class QueryStep:
     type: str  # "query"
     session_id: str
@@ -45,7 +58,7 @@ class QueryStep:
     timestamp: str
     expect_contains: list[str] = field(default_factory=list)
     expect_key: str | None = None
-    judge: str | None = None
+    judge: JudgeSpec | None = None
 
 
 Step = WriteStep | QueryStep
@@ -64,6 +77,17 @@ def _require(d: dict, field_name: str, step_index: int) -> Any:
             f"step {step_index}: missing required field {field_name!r}"
         )
     return d[field_name]
+
+
+def _parse_judge(raw: Any, index: int) -> JudgeSpec | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise PackValidationError(f"step {index}: 'judge' must be a mapping")
+    return JudgeSpec(
+        semantic_recall=raw.get("semantic_recall"),
+        contradiction=raw.get("contradiction"),
+    )
 
 
 def _parse_step(raw: dict, index: int) -> Step:
@@ -92,7 +116,7 @@ def _parse_step(raw: dict, index: int) -> Step:
             timestamp=timestamp,
             expect_contains=raw.get("expect_contains", []) or [],
             expect_key=raw.get("expect_key"),
-            judge=raw.get("judge"),
+            judge=_parse_judge(raw.get("judge"), index),
         )
     raise PackValidationError(
         f"step {index}: unknown step type {step_type!r} (expected 'write' or 'query')"
