@@ -42,3 +42,16 @@ steps:
     query: "Where do I live?"
     expect_contains: ["Austin"]
     expect_key: fact_city
+
+  - type: write
+    session_id: s2
+    key: fact_city
+    role: user
+    content: "Actually, I moved to Seattle."
+    fact_type: update
+
+  - type: query
+    session_id: s2
+    query: "Where do I live now?"
+    expect_contains: ["Seattle"]
+    expect_key: fact_city

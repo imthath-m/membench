@@ -18,7 +18,8 @@ def test_write_json_produces_valid_report(tmp_path):
     assert data["pack_name"] == "mini"
     assert data["backend_name"] == "full-context"
     assert len(data["traces"]) == len(pack.steps)
-    assert data["scores"] == {}
+    assert data["scores"]["recall_precision"] == 1.0
+    assert data["scores"]["update_correctness"] == 1.0
     for trace in data["traces"]:
         assert "latency_ms" in trace
         assert "step_type" in trace

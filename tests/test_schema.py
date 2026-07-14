@@ -13,7 +13,7 @@ def test_load_mini_pack():
     pack = load_pack(builtin_pack_path("mini"))
 
     assert pack.name == "mini"
-    assert len(pack.steps) == 6
+    assert len(pack.steps) == 8
     assert isinstance(pack.steps[0], WriteStep)
     assert isinstance(pack.steps[2], QueryStep)
 

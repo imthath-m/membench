@@ -1,8 +1,8 @@
 """Replay a scenario pack against an adapter, capturing per-step traces.
 
-The runner owns timing and token accounting — adapters only move data.
-Scoring is out of scope for Phase 1; `RunResult.scores` is a placeholder
-populated in Phase 2.
+The runner owns timing, token accounting, and scoring — adapters only move
+data. `RunResult.scores` is populated from `core.scoring` once every step
+has been replayed.
 """
 
 from __future__ import annotations
@@ -86,11 +86,14 @@ def run_pack(pack: Pack, adapter: MemoryAdapter, backend_name: str) -> RunResult
             raise TypeError(f"unknown step type: {step!r}")
 
     finished_at = datetime.now(timezone.utc).isoformat()
+
+    from membench.core.scoring import score_run
+
     return RunResult(
         pack_name=pack.name,
         backend_name=backend_name,
         started_at=started_at,
         finished_at=finished_at,
         traces=traces,
-        scores={},
+        scores=score_run(pack, traces),
     )
