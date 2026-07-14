@@ -1,0 +1,44 @@
+name: mini
+description: >
+  Minimal smoke-test pack: state a couple of facts in one session,
+  query them, then update a fact in a later session and re-query.
+
+steps:
+  - type: write
+    session_id: s1
+    key: fact_color
+    role: user
+    content: "My favorite color is blue."
+    fact_type: state
+
+  - type: write
+    session_id: s1
+    key: fact_city
+    role: user
+    content: "I live in Austin."
+    fact_type: state
+
+  - type: query
+    session_id: s1
+    query: "What is my favorite color?"
+    expect_contains: ["blue"]
+    expect_key: fact_color
+
+  - type: write
+    session_id: s2
+    key: fact_color
+    role: user
+    content: "Actually, my favorite color is green now."
+    fact_type: update
+
+  - type: query
+    session_id: s2
+    query: "What is my favorite color now?"
+    expect_contains: ["green"]
+    expect_key: fact_color
+
+  - type: query
+    session_id: s2
+    query: "Where do I live?"
+    expect_contains: ["Austin"]
+    expect_key: fact_city
