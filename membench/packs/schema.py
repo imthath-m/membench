@@ -123,23 +123,31 @@ def _parse_step(raw: dict, index: int) -> Step:
     )
 
 
+def parse_pack(raw: Any, default_name: str = "pack") -> Pack:
+    """Validate an already-parsed pack mapping (e.g. from `yaml.safe_load`).
+
+    Split out of `load_pack` so a generated pack (Phase 6) can be validated
+    against the exact same rules before it's ever written to disk.
+    """
+    if not isinstance(raw, dict):
+        raise PackValidationError(f"{default_name}: pack must be a YAML mapping")
+
+    name = raw.get("name", default_name)
+    description = raw.get("description", "")
+    raw_steps = raw.get("steps")
+    if not raw_steps or not isinstance(raw_steps, list):
+        raise PackValidationError(f"{default_name}: pack must define a non-empty 'steps' list")
+
+    steps = [_parse_step(step, i) for i, step in enumerate(raw_steps)]
+    return Pack(name=name, description=description, steps=steps)
+
+
 def load_pack(path: str | Path) -> Pack:
     """Load and validate a scenario pack from a YAML file."""
     path = Path(path)
     with path.open() as f:
         raw = yaml.safe_load(f)
-
-    if not isinstance(raw, dict):
-        raise PackValidationError(f"{path}: pack must be a YAML mapping")
-
-    name = raw.get("name", path.stem)
-    description = raw.get("description", "")
-    raw_steps = raw.get("steps")
-    if not raw_steps or not isinstance(raw_steps, list):
-        raise PackValidationError(f"{path}: pack must define a non-empty 'steps' list")
-
-    steps = [_parse_step(step, i) for i, step in enumerate(raw_steps)]
-    return Pack(name=name, description=description, steps=steps)
+    return parse_pack(raw, default_name=path.stem)
 
 
 def builtin_pack_path(pack_name: str) -> Path:

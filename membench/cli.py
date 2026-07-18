@@ -6,13 +6,15 @@ import json
 from pathlib import Path
 
 import typer
+import yaml
 
 from membench.core.registry import get_adapter_class, list_backends
 from membench.core.report.html import render_html
 from membench.core.report.json import write_json
 from membench.core.report.markdown import render_markdown
 from membench.core.runner import run_pack
-from membench.core.scoring.judge import API_KEY_ENV, DEFAULT_JUDGE_MODEL, build_judge
+from membench.core.scoring.judge import API_KEY_ENV, DEFAULT_JUDGE_MODEL, build_judge, resolve_client
+from membench.generate.generator import GenerationError, generate_pack
 from membench.packs.schema import PackValidationError, builtin_pack_path, load_pack
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -84,6 +86,50 @@ def run(
     result = run_pack(loaded_pack, adapter, backend_name=backend, judge=judge_obj)
     write_json(result, out)
     typer.echo(f"Wrote report for pack={loaded_pack.name!r} backend={backend!r} to {out}")
+
+
+@app.command()
+def generate(
+    transcripts: Path = typer.Option(
+        ..., "--transcripts", help="Transcript file or directory to generate a pack from."
+    ),
+    out: Path = typer.Option(..., "--out", help="Path to write the generated pack YAML to."),
+    pack_name: str = typer.Option(
+        "generated", "--pack-name", help="Name for the generated pack."
+    ),
+    judge_model: str = typer.Option(
+        DEFAULT_JUDGE_MODEL, "--judge-model", help="Generation model id (default: Claude)."
+    ),
+    judge_base_url: str = typer.Option(
+        None,
+        "--judge-base-url",
+        help="OpenAI-compatible endpoint base URL; omit for the Anthropic/Claude default.",
+    ),
+) -> None:
+    """Generate a schema-valid scenario pack YAML from a transcript via an LLM.
+
+    Reuses the judge's provider-agnostic client config (model, base URL,
+    `MEMBENCH_JUDGE_API_KEY`) from `core.scoring.judge`. Generation needs an
+    API key; running the resulting pack afterwards does not (`--no-judge`).
+    """
+    client = resolve_client(model=judge_model, base_url=judge_base_url)
+    if client is None:
+        typer.echo(
+            f"Error: pack generation needs an LLM; set ${API_KEY_ENV} "
+            "(running the generated pack afterwards does not need a key: "
+            "membench run --no-judge ...).",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        raw_pack = generate_pack(transcripts, client, pack_name=pack_name)
+    except (GenerationError, OSError, ValueError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    out.write_text(yaml.safe_dump(raw_pack, sort_keys=False))
+    typer.echo(f"Wrote generated pack {raw_pack.get('name', pack_name)!r} to {out}")
 
 
 _RENDERERS = {"md": render_markdown, "html": render_html}

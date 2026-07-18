@@ -89,8 +89,8 @@ class AnthropicClient:
         self.base_url = (base_url or DEFAULT_ANTHROPIC_BASE_URL).rstrip("/")
         self._http = http_client or httpx.Client(timeout=60)
 
-    def score(self, rubric: str, evidence: str) -> Verdict:
-        prompt = build_prompt(rubric, evidence)
+    def complete(self, prompt: str, max_tokens: int = 4096) -> str:
+        """Raw text completion — shared by `score()` and the pack generator."""
         resp = self._http.post(
             f"{self.base_url}/v1/messages",
             headers={
@@ -100,13 +100,16 @@ class AnthropicClient:
             },
             json={
                 "model": self.model,
-                "max_tokens": 256,
+                "max_tokens": max_tokens,
                 "temperature": 0,
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
         resp.raise_for_status()
-        text = resp.json()["content"][0]["text"]
+        return resp.json()["content"][0]["text"]
+
+    def score(self, rubric: str, evidence: str) -> Verdict:
+        text = self.complete(build_prompt(rubric, evidence), max_tokens=256)
         return parse_verdict(text)
 
 
@@ -125,8 +128,8 @@ class OpenAICompatibleClient:
         self.base_url = base_url.rstrip("/")
         self._http = http_client or httpx.Client(timeout=60)
 
-    def score(self, rubric: str, evidence: str) -> Verdict:
-        prompt = build_prompt(rubric, evidence)
+    def complete(self, prompt: str) -> str:
+        """Raw text completion — shared by `score()` and the pack generator."""
         resp = self._http.post(
             f"{self.base_url}/chat/completions",
             headers={
@@ -140,8 +143,10 @@ class OpenAICompatibleClient:
             },
         )
         resp.raise_for_status()
-        text = resp.json()["choices"][0]["message"]["content"]
-        return parse_verdict(text)
+        return resp.json()["choices"][0]["message"]["content"]
+
+    def score(self, rubric: str, evidence: str) -> Verdict:
+        return parse_verdict(self.complete(build_prompt(rubric, evidence)))
 
 
 class JudgeCache:
@@ -187,6 +192,28 @@ class CachedJudge:
         return verdict
 
 
+def resolve_client(
+    *,
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> Judge | None:
+    """Resolve the provider-agnostic client config, or return None with no key.
+
+    Shared by `build_judge` and `generate` (Phase 6 pack generation) — both
+    are configured by the same three values: model, base URL, API key. An
+    explicit `base_url` picks the OpenAI-compatible path; otherwise the
+    default is Anthropic (Claude).
+    """
+    api_key = api_key or os.environ.get(API_KEY_ENV)
+    if not api_key:
+        return None
+    model = model or DEFAULT_JUDGE_MODEL
+    if base_url:
+        return OpenAICompatibleClient(api_key=api_key, model=model, base_url=base_url)
+    return AnthropicClient(api_key=api_key, model=model)
+
+
 def build_judge(
     *,
     model: str | None = None,
@@ -197,16 +224,8 @@ def build_judge(
     """Construct a cached judge, or return None when no API key is available.
 
     A missing key is not an error — the caller reports judge metrics as null.
-    Client selection: an explicit `base_url` picks the OpenAI-compatible path;
-    otherwise the default is Anthropic (Claude).
     """
-    api_key = api_key or os.environ.get(API_KEY_ENV)
-    if not api_key:
+    client = resolve_client(model=model, base_url=base_url, api_key=api_key)
+    if client is None:
         return None
-    model = model or DEFAULT_JUDGE_MODEL
-    client: Judge
-    if base_url:
-        client = OpenAICompatibleClient(api_key=api_key, model=model, base_url=base_url)
-    else:
-        client = AnthropicClient(api_key=api_key, model=model)
     return CachedJudge(client, cache_path)
