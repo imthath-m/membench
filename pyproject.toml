@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 chroma = ["chromadb>=0.5"]
+mem0 = ["mem0ai>=0.1"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]

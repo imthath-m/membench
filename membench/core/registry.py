@@ -7,6 +7,7 @@ from membench.core.adapter import MemoryAdapter
 _REGISTRY: dict[str, str] = {
     "full-context": "membench.adapters.full_context.FullContextAdapter",
     "chroma": "membench.adapters.chroma.ChromaAdapter",
+    "mem0": "membench.adapters.mem0.Mem0Adapter",
 }
 
 
