@@ -5,7 +5,7 @@ from membench.core.registry import get_adapter_class, list_backends
 
 
 def test_list_backends():
-    assert list_backends() == ["chroma", "full-context"]
+    assert list_backends() == ["chroma", "full-context", "mem0"]
 
 
 def test_get_adapter_class_full_context():
