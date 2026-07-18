@@ -108,7 +108,7 @@ def _render_comparison(reports: list[dict]) -> tuple[str, str]:
     labels = [_label(r) for r in reports]
     header = (
         "<tr><th>Metric</th>"
-        + "".join(f'<th class="value">{escape(l)}</th>' for l in labels)
+        + "".join(f'<th class="value">{escape(label)}</th>' for label in labels)
         + "</tr>"
     )
     rows = "".join(

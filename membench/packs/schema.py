@@ -151,8 +151,13 @@ def load_pack(path: str | Path) -> Pack:
 
 
 def builtin_pack_path(pack_name: str) -> Path:
-    """Resolve a builtin pack name (e.g. 'mini') to its YAML file."""
-    path = Path(__file__).parent / f"{pack_name}.yaml"
+    """Resolve a builtin pack name (e.g. 'mini' or 'customer-support') to its YAML file.
+
+    Hyphens are normalized to underscores so CLI-style names (as used in the
+    docs and README, e.g. `--pack customer-support`) resolve to the on-disk
+    `customer_support.yaml`.
+    """
+    path = Path(__file__).parent / f"{pack_name.replace('-', '_')}.yaml"
     if not path.exists():
         raise PackValidationError(f"unknown builtin pack {pack_name!r} (no {path})")
     return path
