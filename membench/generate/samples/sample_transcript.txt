@@ -1,0 +1,11 @@
+[session s1]
+user: Hi, my name is Jamie Rivera and I work as a backend engineer.
+assistant: Nice to meet you, Jamie! How can I help today?
+user: My favorite programming language is Python.
+
+[session s2]
+user: Quick correction — I actually go by Jamie now, not James, please
+  update your records.
+user: Also, I was wrong earlier: my favorite language is actually Go,
+  not Python.
+assistant: Got it, updated to Go.
