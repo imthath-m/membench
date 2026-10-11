@@ -2,7 +2,7 @@
 
 An eval harness for agent memory backends. MemBench replays a scripted
 scenario ("pack") — facts stated, updated, contradicted, and queried across
-sessions — against a memory backend, then scores the result on five metrics:
+sessions — against a memory backend, then scores the result on six metrics:
 recall precision, update correctness, token cost, p95 latency, semantic
 recall, and contradiction rate.
 
@@ -11,12 +11,14 @@ Claude by default).
 
 ## Install
 
+Not published to PyPI yet; install from GitHub:
+
 ```bash
-pip install membench
+pip install "membench @ git+https://github.com/imthath-m/membench"
 
 # optional backends
-pip install membench[chroma]   # local vector-store baseline
-pip install membench[mem0]     # Mem0 OSS backend
+pip install "membench[chroma] @ git+https://github.com/imthath-m/membench"   # local vector-store baseline
+pip install "membench[mem0] @ git+https://github.com/imthath-m/membench"     # Mem0 OSS backend
 ```
 
 ## Quickstart
@@ -84,7 +86,7 @@ no vendor dep), `chroma` (local vector store, no vendor dep), `mem0`
 
 ## Metric definitions
 
-All five appear in every JSON report's `scores` block; `null` means the
+All six appear in every JSON report's `scores` block; `null` means the
 pack (or the run config) didn't exercise that metric.
 
 - **`recall_precision`** — fraction of queries with an `expect_contains`
