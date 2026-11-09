@@ -1,9 +1,10 @@
 """Update correctness: did recall reflect the updated fact, not the stale one.
 
 A write step with `fact_type` of "update" or "contradict" marks that it
-supersedes a previously written fact under the same `key`. Any later query
-whose `expect_key` matches a key that has been updated is scored: does the
-recalled context contain the (updated) `expect_contains` strings?
+supersedes a previously written fact under the same `fact_key`. Any later
+query in the same episode whose `expect_key` matches a fact key that has been
+updated is scored: does the recalled context contain the (updated)
+`expect_contains` strings?
 """
 
 from __future__ import annotations
@@ -25,16 +26,16 @@ def update_correctness(pack: Pack, traces: list[StepTrace]) -> float | None:
     Returns None if the pack never queries a key after updating it (metric
     not applicable).
     """
-    updated_keys: set[str] = set()
+    updated_keys: set[tuple[int, str]] = set()  # (episode, fact_key)
     results: list[bool] = []
 
     for step, trace in zip(pack.steps, traces):
         if isinstance(step, WriteStep):
             if step.fact_type in _UPDATE_FACT_TYPES:
-                updated_keys.add(step.key)
+                updated_keys.add((step.episode, step.fact_key))
         elif (
             isinstance(step, QueryStep)
-            and step.expect_key in updated_keys
+            and (step.episode, step.expect_key) in updated_keys
             and step.expect_contains
         ):
             results.append(_passes(step.expect_contains, trace.detail["context"]))

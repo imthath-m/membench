@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from membench.core.adapter import Event, MemoryAdapter, RecallResult
-from membench.core.tokens import count_tokens
+from membench.core.adapter import Event, MemoryAdapter, RecalledItem, RecallResult
 
 
 class FullContextAdapter(MemoryAdapter):
@@ -16,14 +15,16 @@ class FullContextAdapter(MemoryAdapter):
     def write(self, event: Event) -> None:
         self._events.append(event)
 
-    def recall(self, query: str) -> RecallResult:
+    def recall(self, query: str, *, session_id: str, at: str) -> RecallResult:
         lines = [f"[{e.role}] {e.content}" for e in self._events]
-        context = "\n".join(lines)
         return RecallResult(
-            context=context,
-            items=list(self._events),
-            token_count=count_tokens(context),
+            context="\n".join(lines),
+            items=[RecalledItem(event_ids=[e.id], text=e.content) for e in self._events],
         )
 
-    def forget(self, key: str) -> None:
-        self._events = [e for e in self._events if e.key != key]
+    def forget(self, event_ids: list[str]) -> None:
+        targets = set(event_ids)
+        self._events = [e for e in self._events if e.id not in targets]
+
+    def reset(self) -> None:
+        self._events = []

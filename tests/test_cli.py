@@ -142,11 +142,11 @@ class ExplodingAdapter(FullContextAdapter):
         super().__init__(config)
         self.recalls = 0
 
-    def recall(self, query):
+    def recall(self, query, **kwargs):
         self.recalls += 1
         if self.recalls == 2:
             raise RuntimeError("backend exploded")
-        return super().recall(query)
+        return super().recall(query, **kwargs)
 
 
 def test_run_forced_adapter_exception_still_writes_report(monkeypatch, tmp_path):

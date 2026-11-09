@@ -9,8 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from membench.core.adapter import Event, MemoryAdapter, RecallResult
-from membench.core.tokens import count_tokens
+from membench.core.adapter import Event, MemoryAdapter, RecalledItem, RecallResult
 
 try:
     import chromadb
@@ -37,7 +36,7 @@ class ChromaAdapter(MemoryAdapter):
 
     def write(self, event: Event) -> None:
         self._collection.upsert(
-            ids=[event.key],
+            ids=[event.id],
             documents=[event.content],
             metadatas=[
                 {
@@ -48,23 +47,23 @@ class ChromaAdapter(MemoryAdapter):
             ],
         )
 
-    def recall(self, query: str) -> RecallResult:
+    def recall(self, query: str, *, session_id: str, at: str) -> RecallResult:
         count = self._collection.count()
         if count == 0:
-            return RecallResult(context="", items=[], token_count=0)
+            return RecallResult(context="")
         results = self._collection.query(
             query_texts=[query], n_results=min(self.top_k, count)
         )
-        documents = results.get("documents", [[]])[0]
-        context = "\n".join(documents)
-        return RecallResult(
-            context=context,
-            items=documents,
-            token_count=count_tokens(context),
-        )
+        ids, documents = results["ids"][0], results["documents"][0]
+        distances = results["distances"][0]
+        items = [
+            RecalledItem(event_ids=[i], text=doc, score=-float(dist))  # closer = higher
+            for i, doc, dist in zip(ids, documents, distances)
+        ]
+        return RecallResult(context="\n".join(documents), items=items)
 
-    def forget(self, key: str) -> None:
-        self._collection.delete(ids=[key])
+    def forget(self, event_ids: list[str]) -> None:
+        self._collection.delete(ids=list(event_ids))
 
     def reset(self) -> None:
         self._client.delete_collection(self._collection_name)

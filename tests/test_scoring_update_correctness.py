@@ -7,7 +7,8 @@ def _write(key: str, fact_type: str = "state") -> WriteStep:
     return WriteStep(
         type="write",
         session_id="s1",
-        key=key,
+        id=f"evt-{key}",
+        fact_key=key,
         role="user",
         content="c",
         timestamp="t",

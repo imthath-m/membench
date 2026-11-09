@@ -13,13 +13,14 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
 from membench.core.adapter import Event, MemoryAdapter, RecallResult
 from membench.core.retry import retry_call
-from membench.packs.schema import Pack, QueryStep, WriteStep
+from membench.core.tokens import count_tokens
+from membench.packs.schema import ForgetStep, Pack, QueryStep, WriteStep
 
 logger = logging.getLogger("membench")
 
@@ -30,11 +31,12 @@ MAX_ERROR_RATE = 0.1
 @dataclass
 class StepTrace:
     step_index: int
-    step_type: str  # "write" | "query"
+    step_type: str  # "write" | "query" | "forget"
     session_id: str
     latency_ms: float
     detail: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
+    episode: int = 0
 
 
 @dataclass
@@ -45,6 +47,7 @@ class RunResult:
     finished_at: str
     traces: list[StepTrace] = field(default_factory=list)
     scores: dict[str, Any] = field(default_factory=dict)
+    usage: dict[str, int] | None = None  # adapter.usage(): backend LLM/embedding tokens
     valid: bool = True
 
 
@@ -110,66 +113,95 @@ def run_pack(
     backend_name: str,
     judge: Any = None,
     step_timeout: float | None = DEFAULT_STEP_TIMEOUT_S,
+    tokenizer: Callable[[str], int] = count_tokens,
 ) -> RunResult:
     """Replay every step in `pack` against `adapter` in order.
 
     `judge` is an optional `core.scoring.judge.Judge`; when None the judge
     metrics score as None. `step_timeout` (seconds, None for no limit) caps
-    each adapter call, retries included.
+    each adapter call, retries included. `tokenizer` counts each recalled
+    `context`. `adapter.reset()` runs between episodes; if it fails, every
+    step of that episode is recorded as an error. `adapter.flush()` runs
+    before a query that follows writes or forgets, timed as `ingest_latency_ms`.
     """
     started_at = datetime.now(timezone.utc).isoformat()
     traces: list[StepTrace] = []
+    episode, reset_error, pending_ingest = 0, None, False
 
     for index, step in enumerate(pack.steps):
+        if step.episode != episode:
+            episode, pending_ingest = step.episode, False
+            _, _, _, reset_error = _run_step(adapter.reset, adapter, index, step_timeout)
+
+        def call(
+            fn: Callable[[], Any], index: int = index, reset_error: str | None = reset_error
+        ) -> tuple[Any, float, int, str | None]:
+            if reset_error is not None:  # this episode never started cleanly
+                return None, 0.0, 0, f"reset before episode failed: {reset_error}"
+            return _run_step(fn, adapter, index, step_timeout)
+
         if isinstance(step, WriteStep):
             event = Event(
+                id=step.id,
                 session_id=step.session_id,
-                key=step.key,
                 role=step.role,
                 content=step.content,
                 timestamp=step.timestamp,
                 metadata=step.metadata,
             )
-            _, latency_ms, retries, error = _run_step(
-                lambda event=event: adapter.write(event), adapter, index, step_timeout
+            _, latency_ms, retries, error = call(lambda event=event: adapter.write(event))
+            pending_ingest = True
+            detail = {
+                "event_id": step.id,
+                "fact_key": step.fact_key,
+                "fact_type": step.fact_type,
+                "retries": retries,
+            }
+        elif isinstance(step, ForgetStep):
+            _, latency_ms, retries, error = call(
+                lambda target=list(step.target): adapter.forget(target)
             )
-            traces.append(
-                StepTrace(
-                    step_index=index,
-                    step_type="write",
-                    session_id=step.session_id,
-                    latency_ms=latency_ms,
-                    detail={"key": step.key, "fact_type": step.fact_type, "retries": retries},
-                    error=error,
-                )
-            )
+            pending_ingest = True
+            detail = {"target": step.target, "retries": retries}
         elif isinstance(step, QueryStep):
-            result, latency_ms, retries, error = _run_step(
-                lambda query=step.query: adapter.recall(query), adapter, index, step_timeout
-            )
+            ingest_ms, error, result, latency_ms, retries = None, None, None, 0.0, 0
+            if pending_ingest:
+                _, ingest_ms, _, error = call(adapter.flush)
+                pending_ingest = False
+                error = error and f"flush: {error}"
+            if error is None:
+                result, latency_ms, retries, error = call(
+                    lambda step=step: adapter.recall(
+                        step.query, session_id=step.session_id, at=step.timestamp
+                    )
+                )
             if result is None:  # failed step: nothing was recalled
                 result = RecallResult(context="")
-            traces.append(
-                StepTrace(
-                    step_index=index,
-                    step_type="query",
-                    session_id=step.session_id,
-                    latency_ms=latency_ms,
-                    detail={
-                        "query": step.query,
-                        "context": result.context,
-                        "token_count": result.token_count,
-                        "item_count": len(result.items),
-                        "expect_contains": step.expect_contains,
-                        "expect_key": step.expect_key,
-                        "retries": retries,
-                    },
-                    error=error,
-                )
-            )
+            detail = {
+                "query": step.query,
+                "context": result.context,
+                "token_count": tokenizer(result.context),
+                "items": [asdict(item) for item in result.items],
+                "ingest_latency_ms": ingest_ms,
+                "expect_contains": step.expect_contains,
+                "expect_key": step.expect_key,
+                "retries": retries,
+            }
         else:  # pragma: no cover - schema guarantees this can't happen
             raise TypeError(f"unknown step type: {step!r}")
+        traces.append(
+            StepTrace(
+                step_index=index,
+                step_type=step.type,
+                session_id=step.session_id,
+                latency_ms=latency_ms,
+                detail=detail,
+                error=error,
+                episode=episode,
+            )
+        )
 
+    usage, _, _, _ = _run_step(adapter.usage, adapter, len(pack.steps), step_timeout)
     finished_at = datetime.now(timezone.utc).isoformat()
 
     from membench.core.scoring import score_run
@@ -183,5 +215,6 @@ def run_pack(
         finished_at=finished_at,
         traces=traces,
         scores=scores,
+        usage=usage,
         valid=error_rate is None or error_rate <= MAX_ERROR_RATE,
     )

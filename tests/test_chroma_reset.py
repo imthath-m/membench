@@ -33,7 +33,7 @@ def test_reset_recreates_collection(monkeypatch):
     adapter = chroma_module.ChromaAdapter({"collection_name": "c1"})
     adapter.write(
         chroma_module.Event(
-            session_id="s1", key="k1", role="user", content="x", timestamp="t"
+            id="e1", session_id="s1", role="user", content="x", timestamp="t"
         )
     )
 

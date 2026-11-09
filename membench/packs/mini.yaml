@@ -6,14 +6,14 @@ description: >
 steps:
   - type: write
     session_id: s1
-    key: fact_color
+    fact_key: fact_color
     role: user
     content: "My favorite color is blue."
     fact_type: state
 
   - type: write
     session_id: s1
-    key: fact_city
+    fact_key: fact_city
     role: user
     content: "I live in Austin."
     fact_type: state
@@ -26,7 +26,7 @@ steps:
 
   - type: write
     session_id: s2
-    key: fact_color
+    fact_key: fact_color
     role: user
     content: "Actually, my favorite color is green now."
     fact_type: update
@@ -50,7 +50,7 @@ steps:
 
   - type: write
     session_id: s2
-    key: fact_city
+    fact_key: fact_city
     role: user
     content: "Actually, I moved to Seattle."
     fact_type: update
