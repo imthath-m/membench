@@ -10,11 +10,14 @@ from pathlib import Path
 import typer
 import yaml
 
+from membench.core.publish import RecordingCache, result_dir, sha256_file, trim, write_result
 from membench.core.reader import READER_API_KEY_ENV, Reader
 from membench.core.registry import get_adapter_class, list_backends
 from membench.core.report.compare import compare_reports, render_compare_markdown
+from membench.core.report.failures import render_failures
 from membench.core.report.html import render_html
 from membench.core.report.json import write_json
+from membench.core.report.leaderboard import collect, render_leaderboard
 from membench.core.report.markdown import render_markdown
 from membench.core.runner import (
     DEFAULT_STEP_TIMEOUT_S,
@@ -318,8 +321,29 @@ def report(
         "md", "--format", help="Output format: 'md' or 'html'."
     ),
     out: Path = typer.Option(..., "--out", help="Path to write the rendered report to."),
+    failures: bool = typer.Option(
+        False, "--failures", help="Per-query failure listing of one report (Markdown): not "
+        "retrieved / stale surfaced / answered wrong / false abstention / forget violation.",
+    ),
+    excerpt_chars: int = typer.Option(
+        200, "--excerpt-chars", min=0,
+        help="Context excerpt length in the failure listing (0 = ids only, e.g. for LoCoMo).",
+    ),
 ) -> None:
     """Render one or more JSON reports as a Markdown or HTML scorecard."""
+    if failures:
+        try:
+            if len(in_paths) != 1 or format != "md":
+                raise ValueError("--failures takes exactly one --in and --format md")
+            report_data = json.loads(in_paths[0].read_text())
+            text = render_failures(report_data, _report_pack(report_data, in_paths[0]),
+                                   excerpt_chars)
+        except (PackValidationError, ValueError, KeyError, OSError, yaml.YAMLError) as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        out.write_text(text)
+        typer.echo(f"Wrote failure listing to {out}")
+        return
     renderer = _RENDERERS.get(format)
     if renderer is None:
         typer.echo(
@@ -336,6 +360,31 @@ def report(
 
     out.write_text(renderer(reports))
     typer.echo(f"Wrote {format} report from {len(reports)} run(s) to {out}")
+
+
+_RESULTS_ARG = typer.Argument(Path("results"), help="Results root (published runs).")
+
+
+@app.command()
+def leaderboard(
+    results: Path = _RESULTS_ARG,
+    out: Path = typer.Option(
+        None, "--out", help="Write the Markdown table here (default stdout)."
+    ),
+) -> None:
+    """Backend × metric tables (value, 95% CI, n, cost per 1k queries, recall p95) from every
+    committed result under RESULTS, one table per dataset, judge and reader."""
+    try:
+        entries = collect(results)
+    except (OSError, json.JSONDecodeError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    text = render_leaderboard(entries, (out or Path("x")).resolve().parent)
+    if out is None:
+        typer.echo(text)
+        return
+    out.write_text(text)
+    typer.echo(f"Wrote leaderboard of {len(entries)} result(s) to {out}")
 
 
 @app.command()
@@ -482,6 +531,50 @@ def _rescore_run(run: dict, pack: Pack, judge: object, kept: list[int] | None) -
         "stats": scoring.stats,
         "valid": error_rate is None or error_rate <= MAX_ERROR_RATE,
     }
+
+
+@app.command()
+def publish(
+    in_path: Path = typer.Option(..., "--in", help="JSON report of the run to publish."),
+    results: Path = typer.Option(Path("results"), "--results", help="Results root."),
+    judge_cache: Path = typer.Option(
+        Path(".membench_judge_cache.json"), "--judge-cache",
+        help="Judge cache the run wrote (only the entries it uses are published).",
+    ),
+    config: str = typer.Option(
+        "default", "--config", help="Backend config label: 'default' or 'vendor-tuned' "
+        "(its own leaderboard row)."
+    ),
+    lock: Path = typer.Option(Path("uv.lock"), "--lock", help="Lock file whose sha256 to record."),
+) -> None:
+    """Copy a run into `results/<date>/<dataset>/<backend>/` (report.json, judge_cache.json,
+    meta.json), after checking that it re-scores identically offline."""
+    try:
+        report_data = json.loads(in_path.read_text())
+        directory = result_dir(report_data, results, config)
+        loaded_pack = _report_pack(report_data, in_path)
+        judge_info = report_data["manifest"].get("judge")
+        judge_obj = None
+        if judge_info is not None:
+            judge_obj = build_judge(
+                model=judge_info["model"], base_url=judge_info["base_url"],
+                cache_path=judge_cache, strict=True,
+            )
+            judge_obj.cache = RecordingCache(judge_cache)
+        for run in [report_data, *report_data.get("repeats", [])]:
+            new = _rescore_run(run, loaded_pack, judge_obj, None)
+            if any(run.get(k) != new[k] for k in ("scores", "by_category", "outcomes", "stats")):
+                raise ValueError(f"{in_path} does not re-score identically; run "
+                                 f"`membench rescore --in {in_path} --check` to see the diff")
+    except (
+        PackValidationError, ValueError, TypeError, KeyError, OSError, CacheMissError,
+        yaml.YAMLError,
+    ) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    meta = {"config": config, "uv_lock_sha256": sha256_file(lock), "trimmed": trim(report_data)}
+    write_result(directory, report_data, judge_obj.cache.used if judge_obj else {}, meta)
+    typer.echo(f"Published {in_path} to {directory}")
 
 
 def _builtin_pack_names() -> list[str]:
