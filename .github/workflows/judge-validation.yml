@@ -1,0 +1,59 @@
+name: Judge validation
+
+# Manual only: spends real API credit. Runs the cross-judge panel
+# (configs/judges.yaml) on validation/sample.jsonl and the agreement report.
+# Needs repository secrets MEMBENCH_JUDGE_API_KEY (Claude), OPENAI_API_KEY (GPT)
+# and TOGETHER_API_KEY (open-weight model), or whatever the panel's
+# `api_key_env` entries name. Commit the uploaded validation/ files in a PR.
+on:
+  workflow_dispatch:
+    inputs:
+      labels:
+        description: "Human labels file (empty = judge-vs-judge only)"
+        default: "validation/labels.jsonl"
+
+jobs:
+  cross-judge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MEMBENCH_JUDGE_API_KEY: ${{ secrets.MEMBENCH_JUDGE_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+    steps:
+      - name: Check secrets
+        run: |
+          if [ -z "$MEMBENCH_JUDGE_API_KEY" ] || [ -z "$OPENAI_API_KEY" ] || [ -z "$TOGETHER_API_KEY" ]; then
+            echo "::error::Set MEMBENCH_JUDGE_API_KEY, OPENAI_API_KEY and TOGETHER_API_KEY."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install membench (frozen from uv.lock)
+        run: |
+          pip install uv
+          uv sync --frozen
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Cross-judge run
+        run: membench judge-cross --sample validation/sample.jsonl --judges configs/judges.yaml
+
+      - name: Agreement report
+        run: |
+          if [ -n "${{ inputs.labels }}" ] && [ -f "${{ inputs.labels }}" ]; then
+            labels="--labels ${{ inputs.labels }}"
+          fi
+          membench judge-agreement $labels --verdicts "validation/verdicts-v$(python -c \
+            'from membench.core.scoring.judge import JUDGE_PROMPT_VERSION as v; print(v)').jsonl"
+          cat validation/agreement-v*.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: judge-validation
+          path: validation/

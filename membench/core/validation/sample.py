@@ -135,7 +135,7 @@ def stratified_sample(items: list[dict], n_per_metric: int = DEFAULT_N_PER_METRI
             for group in strata:
                 if group and len(picked) < n_per_metric:
                     picked.append(group.pop())
-        sample += sorted(picked, key=lambda i: (stratum(i), i["id"]))
+        sample += sorted(picked, key=lambda i: i["id"])  # hash order: hides the strata
     return sample
 
 
