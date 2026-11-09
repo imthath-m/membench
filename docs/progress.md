@@ -5,6 +5,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 |---|---|---|---|
 | 8 | claude/gracious-edison-v8eyxs | #6 | done (live run blocked) |
 | 9 | claude/gracious-edison-v8eyxs-phase-9 | #7 | done |
+| 10 | claude/gracious-edison-v8eyxs-phase-10 | — | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -50,3 +51,15 @@ Status: done
   - Trace detail: write `{event_id, fact_key, fact_type, retries}`; forget `{target, retries}`; query adds `items` (list of `{event_ids, text, score}`) and drops `item_count`. Forget latency is pooled into `p95_latency_ms` and counted in `error_rate`.
   - `update_correctness` scopes updates per episode. Chroma item score is `-distance`; Mem0 maps memory id → source Event.ids (an add may create/update several memories; forgetting an event deletes every memory derived from it).
   - Chroma still scores 1.0 `update_correctness` on the bundled packs at `top_k=3` (both values are surfaced), now earned; the Phase 11 staleness metric is what penalises that.
+
+## Phase 10 — Reproducibility + cost accounting
+Status: in progress
+- [ ] Run manifest in every report (schema_version, membench version + git commit/dirty, Python/OS, backend SDK versions, redacted backend config, pack name + sha256, dataset slot, judge/reader/backend models + base URLs, judge prompt version, tokenizer, seed, repeat index, deployment, start/finish)
+- [ ] `JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`
+- [ ] Judge `--strict-cache` (cache miss is an error)
+- [ ] `membench rescore --in report.json` (no adapter, no network)
+- [ ] `uv.lock` + frozen sync for published (live) runs; floor versions kept
+- [ ] Cost tracking: judge / reader / backend tokens from API `usage`; dated price table → USD per run and per 1k queries (Mem0 `usage()`)
+- [ ] Determinism: seed, embedding model id + temperature recorded; non-determinism documented
+- [ ] Committed JSON Schema; every report validates (test)
+- [ ] CI test: `rescore` on a committed report reproduces identical scores offline
