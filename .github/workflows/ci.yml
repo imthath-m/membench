@@ -55,7 +55,7 @@ jobs:
         run: pip install -e ".[dev,chroma]"
 
       - name: Test chroma adapter
-        run: pytest tests/test_chroma_adapter.py tests/test_chroma_reset.py -rs
+        run: pytest tests/test_chroma_adapter.py tests/test_chroma_reset.py tests/test_adapter_contract.py -rs
 
       - name: Offline chroma example run (no judge, no API key)
         run: membench run --backend chroma --pack customer-support --no-judge --out report.json

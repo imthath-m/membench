@@ -90,7 +90,7 @@ def run(
     step_timeout: float = typer.Option(
         DEFAULT_STEP_TIMEOUT_S,
         "--step-timeout",
-        help="Seconds each write/recall may take (retries included) before it is recorded "
+        help="Seconds each adapter call may take (retries included) before it is recorded "
         "as an error.",
     ),
 ) -> None:
