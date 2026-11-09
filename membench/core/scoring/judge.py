@@ -55,6 +55,15 @@ class Judge(Protocol):
     def score(self, rubric: str, evidence: str) -> Verdict: ...
 
 
+class JudgeError(Exception):
+    """A judge call gave no usable verdict; the query is recorded, not scored."""
+
+
+def record_judge_error(detail: dict[str, Any], metric: str, exc: JudgeError) -> None:
+    """Note a judge failure on a query trace's `detail`, keyed by metric."""
+    detail.setdefault("judge_error", {})[metric] = str(exc)
+
+
 def build_prompt(rubric: str, evidence: str) -> str:
     """Deterministic structured prompt shared by every client and the cache key."""
     return (
@@ -68,6 +77,8 @@ def build_prompt(rubric: str, evidence: str) -> str:
 
 def parse_verdict(text: str) -> Verdict:
     """Parse a model's JSON reply into a Verdict, tolerating surrounding prose."""
+    if not isinstance(text, str):
+        raise TypeError(f"judge reply text is {type(text).__name__}, not str")
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1:
@@ -193,7 +204,12 @@ class JudgeCache:
 
 
 class CachedJudge:
-    """Wraps a client with an on-disk cache; a cache hit makes zero client calls."""
+    """Wraps a client with an on-disk cache; a cache hit makes zero client calls.
+
+    A reply that fails to parse (`ValueError`) is retried once; an unexpected
+    response shape (`KeyError`, `IndexError`, `TypeError`) is not. Either
+    failure raises `JudgeError` and is never cached.
+    """
 
     def __init__(self, client: Judge, cache_path: str | Path) -> None:
         self.client = client
@@ -206,9 +222,22 @@ class CachedJudge:
         cached = self.cache.get(key)
         if cached is not None:
             return cached
-        verdict = self.client.score(rubric, evidence)
+        verdict = self._score_uncached(rubric, evidence)
         self.cache.set(key, verdict)
         return verdict
+
+    def _score_uncached(self, rubric: str, evidence: str) -> Verdict:
+        for attempt in range(2):
+            try:
+                return self.client.score(rubric, evidence)
+            except (KeyError, IndexError, TypeError) as exc:
+                raise JudgeError(
+                    f"unexpected judge response shape: {type(exc).__name__}: {exc}"
+                ) from exc
+            except ValueError as exc:
+                if attempt == 1:
+                    raise JudgeError(f"judge reply failed to parse twice: {exc}") from exc
+        raise AssertionError("unreachable")  # pragma: no cover
 
 
 def resolve_client(

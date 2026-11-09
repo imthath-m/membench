@@ -90,7 +90,7 @@ def test_run_pack_judge_metrics_null_when_no_judge():
 
     assert set(result.scores) == {
         "recall_precision", "update_correctness", "token_cost", "p95_latency_ms",
-        "semantic_recall", "contradiction_rate",
+        "semantic_recall", "contradiction_rate", "error_rate",
     }
     assert result.scores["semantic_recall"] is None
     assert result.scores["contradiction_rate"] is None

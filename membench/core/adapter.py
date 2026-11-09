@@ -41,7 +41,11 @@ class MemoryAdapter(ABC):
     """Thin interface every memory backend implements.
 
     Construction takes a plain dict of config (from pack/CLI config).
+    `retryable` lists transient exception types (rate limits, timeouts) the
+    runner retries with backoff; anything else fails the step.
     """
+
+    retryable: tuple[type[BaseException], ...] = ()
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config = config or {}

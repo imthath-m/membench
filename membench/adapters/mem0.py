@@ -15,9 +15,20 @@ try:
 except ImportError:  # pragma: no cover - exercised only when mem0 missing
     Memory = None
 
+try:  # Mem0's default LLM/embedder calls go through the OpenAI SDK.
+    import openai
+
+    _RETRYABLE: tuple[type[BaseException], ...] = (
+        openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError
+    )
+except ImportError:  # pragma: no cover - exercised only when openai missing
+    _RETRYABLE = ()
+
 
 class Mem0Adapter(MemoryAdapter):
     """Mem0 OSS baseline backend."""
+
+    retryable = _RETRYABLE
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         if Memory is None:
