@@ -133,10 +133,10 @@ Status: done (with blocked items)
 Status: in progress
 - [x] `--repeats N` (default 3 when backend or judge/reader uses an LLM, else 1); fresh `reset()` + new namespace per repeat; report holds mean, run-to-run SD, every repeat
 - [x] 95% CIs: seeded bootstrap over queries (10k resamples) / Wilson for plain proportions, next to every rate
-- [ ] Paired comparison (`membench compare`): paired bootstrap of the difference + McNemar for pass/fail metrics; flags differences whose CI includes 0
-- [ ] Minimum sample sizes enforced in reports: headline ≥385, per-category ≥100 ("indicative"), p95 ≥100 per op
-- [ ] Holm correction in comparison reports (metrics × categories)
-- [ ] md/html reports show n + CI for every metric; suppress/label below min n
+- [x] Paired comparison (`membench compare`): paired bootstrap of the difference + McNemar for pass/fail metrics; flags differences whose CI includes 0
+- [x] Minimum sample sizes enforced in reports: headline ≥385, per-category ≥100 ("indicative"), p95 ≥100 per op
+- [x] Holm correction in comparison reports (metrics × categories)
+- [x] md/html reports show n + CI for every metric; suppress/label below min n
 - [x] `rescore` reproduces CIs (seeded); schema + fixture regenerated
 - [ ] Two runs of the same config have overlapping CIs (offline demo on full-context / chroma)
 - [ ] Tests + README docs
