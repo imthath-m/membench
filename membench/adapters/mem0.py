@@ -30,6 +30,7 @@ class Mem0Adapter(MemoryAdapter):
 
     retryable = _RETRYABLE
     packages = ("mem0ai", "openai")
+    uses_llm = True
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         if Memory is None:
@@ -39,7 +40,7 @@ class Mem0Adapter(MemoryAdapter):
                 "to use the mem0 backend."
             )
         super().__init__(config)
-        self.user_id = self.config.get("user_id", "membench")
+        self.user_id = self.config.get("user_id", self.namespace)
         self.top_k = int(self.config.get("top_k", 3))
         mem0_config = self.config.get("mem0_config")
         self._client = Memory.from_config(mem0_config) if mem0_config else Memory()

@@ -1,14 +1,14 @@
 {
   "pack_name": "customer_support",
   "backend_name": "full-context",
-  "started_at": "2026-11-09T04:40:17.753042+00:00",
-  "finished_at": "2026-11-09T04:40:17.758726+00:00",
+  "started_at": "2026-11-09T07:15:02.283303+00:00",
+  "finished_at": "2026-11-09T07:15:02.289033+00:00",
   "traces": [
     {
       "step_index": 0,
       "step_type": "write",
       "session_id": "t1",
-      "latency_ms": 1.2764110006173723,
+      "latency_ms": 0.4021400000056019,
       "detail": {
         "event_id": "cs-name",
         "fact_key": "fact_name",
@@ -22,7 +22,7 @@
       "step_index": 1,
       "step_type": "write",
       "session_id": "t1",
-      "latency_ms": 0.24454599952150602,
+      "latency_ms": 0.3551610000158689,
       "detail": {
         "event_id": "cs-email",
         "fact_key": "fact_email",
@@ -36,7 +36,7 @@
       "step_index": 2,
       "step_type": "write",
       "session_id": "t1",
-      "latency_ms": 0.20079499972780468,
+      "latency_ms": 0.38977200006229396,
       "detail": {
         "event_id": "cs-plan-basic",
         "fact_key": "fact_plan",
@@ -50,7 +50,7 @@
       "step_index": 3,
       "step_type": "write",
       "session_id": "t1",
-      "latency_ms": 0.22916600028111134,
+      "latency_ms": 0.21499100000710314,
       "detail": {
         "event_id": "cs-order-4471",
         "fact_key": "fact_order",
@@ -64,7 +64,7 @@
       "step_index": 4,
       "step_type": "query",
       "session_id": "t1",
-      "latency_ms": 0.23068400059855776,
+      "latency_ms": 0.1855450000221026,
       "detail": {
         "query": "What is the customer's name?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.",
@@ -99,7 +99,7 @@
             "score": null
           }
         ],
-        "ingest_latency_ms": 0.1788120007404359,
+        "ingest_latency_ms": 0.2918400000453403,
         "expect_contains": [
           "Dana"
         ],
@@ -115,7 +115,7 @@
       "step_index": 5,
       "step_type": "query",
       "session_id": "t1",
-      "latency_ms": 0.15959100073814625,
+      "latency_ms": 0.15703000008215895,
       "detail": {
         "query": "Which subscription plan is the customer on?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.",
@@ -166,7 +166,7 @@
       "step_index": 6,
       "step_type": "write",
       "session_id": "t2",
-      "latency_ms": 0.10966799982270459,
+      "latency_ms": 0.14519799992740445,
       "detail": {
         "event_id": "cs-plan-pro",
         "fact_key": "fact_plan",
@@ -180,7 +180,7 @@
       "step_index": 7,
       "step_type": "write",
       "session_id": "t2",
-      "latency_ms": 0.14559899955202127,
+      "latency_ms": 0.11554399998203735,
       "detail": {
         "event_id": "cs-address-elm",
         "fact_key": "fact_address",
@@ -194,7 +194,7 @@
       "step_index": 8,
       "step_type": "write",
       "session_id": "t2",
-      "latency_ms": 0.10354300047765719,
+      "latency_ms": 0.13555100008488807,
       "detail": {
         "event_id": "cs-order-7788",
         "fact_key": "fact_order",
@@ -208,7 +208,7 @@
       "step_index": 9,
       "step_type": "query",
       "session_id": "t2",
-      "latency_ms": 0.1885960000436171,
+      "latency_ms": 0.24111400000492722,
       "detail": {
         "query": "Which subscription plan is the customer on now?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
@@ -264,7 +264,7 @@
             "score": null
           }
         ],
-        "ingest_latency_ms": 0.22227899989957223,
+        "ingest_latency_ms": 0.10393200000180514,
         "expect_contains": [
           "Pro"
         ],
@@ -280,7 +280,7 @@
       "step_index": 10,
       "step_type": "query",
       "session_id": "t2",
-      "latency_ms": 0.13419400056591257,
+      "latency_ms": 0.17273799994654837,
       "detail": {
         "query": "What is the customer's correct order number?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
@@ -352,7 +352,7 @@
       "step_index": 11,
       "step_type": "write",
       "session_id": "t3",
-      "latency_ms": 0.10053400001197588,
+      "latency_ms": 0.1696140000149171,
       "detail": {
         "event_id": "cs-pref-email",
         "fact_key": "fact_pref",
@@ -366,7 +366,7 @@
       "step_index": 12,
       "step_type": "write",
       "session_id": "t3",
-      "latency_ms": 0.08652799988340121,
+      "latency_ms": 0.16573599998537247,
       "detail": {
         "event_id": "cs-address-oak",
         "fact_key": "fact_address",
@@ -380,7 +380,7 @@
       "step_index": 13,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.10457000007590977,
+      "latency_ms": 0.15018299995972484,
       "detail": {
         "query": "What is the customer's current shipping address?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
@@ -450,7 +450,7 @@
             "score": null
           }
         ],
-        "ingest_latency_ms": 0.08562099992559524,
+        "ingest_latency_ms": 0.14008800008014077,
         "expect_contains": [
           "Oak Avenue",
           "Seattle"
@@ -467,7 +467,7 @@
       "step_index": 14,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.11968499984504888,
+      "latency_ms": 0.16236099997968267,
       "detail": {
         "query": "How does the customer prefer to be contacted?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
@@ -553,7 +553,7 @@
       "step_index": 15,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.12144499942223774,
+      "latency_ms": 0.19490900001528644,
       "detail": {
         "query": "Summarize the customer's plan history.",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
@@ -637,7 +637,7 @@
       "step_index": 16,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.1025060000756639,
+      "latency_ms": 0.15683999993143516,
       "detail": {
         "query": "Which plan was the customer on in early February 2025?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
@@ -723,7 +723,7 @@
       "step_index": 17,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.10691000079532387,
+      "latency_ms": 0.12827899990952574,
       "detail": {
         "query": "On what date did the customer upgrade to the Pro plan?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
@@ -809,7 +809,7 @@
       "step_index": 18,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.10249000024487032,
+      "latency_ms": 0.11331600001085462,
       "detail": {
         "query": "What is the customer's phone number?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
@@ -893,7 +893,7 @@
       "step_index": 19,
       "step_type": "write",
       "session_id": "t4",
-      "latency_ms": 0.08321799941768404,
+      "latency_ms": 0.0883740000290345,
       "detail": {
         "event_id": "cs-erase-request",
         "fact_key": "fact_erase",
@@ -907,7 +907,7 @@
       "step_index": 20,
       "step_type": "forget",
       "session_id": "t4",
-      "latency_ms": 0.09950200001185294,
+      "latency_ms": 0.10709799994401692,
       "detail": {
         "target": [
           "cs-email"
@@ -921,7 +921,7 @@
       "step_index": 21,
       "step_type": "query",
       "session_id": "t4",
-      "latency_ms": 0.11029500001313863,
+      "latency_ms": 0.10722699994403229,
       "detail": {
         "query": "What is the customer's email address?",
         "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.\n[2025-06-18T16:00:00+00:00] [user] Please delete my email address from your records.",
@@ -991,7 +991,7 @@
             "score": null
           }
         ],
-        "ingest_latency_ms": 0.10606700016069226,
+        "ingest_latency_ms": 0.0870829999257694,
         "expect_contains": [],
         "expect_key": null,
         "category": "forget",
@@ -1014,11 +1014,11 @@
     "contradiction_rate": 1.0,
     "qa_accuracy": 1.0,
     "token_cost": 82.54545454545455,
-    "write_p50_ms": 0.10966799982270459,
+    "write_p50_ms": 0.16573599998537247,
     "write_p95_ms": null,
-    "ingest_p50_ms": 0.10606700016069226,
+    "ingest_p50_ms": 0.10393200000180514,
     "ingest_p95_ms": null,
-    "recall_p50_ms": 0.11968499984504888,
+    "recall_p50_ms": 0.15703000008215895,
     "recall_p95_ms": null,
     "error_rate": 0.0
   },
@@ -1072,7 +1072,7 @@
     "schema_version": "2",
     "membench": {
       "version": "0.2.0",
-      "git_commit": "80ad12756b6308ec89426ceec1ee9bb5413d5238",
+      "git_commit": "f1cb3530551c1dc72ef11a81e7c1bd726b1374f9",
       "git_dirty": true
     },
     "python": "3.13.18",
@@ -1105,8 +1105,8 @@
     "tokenizer": "whitespace:approx",
     "seed": 0,
     "repeat": 0,
-    "started_at": "2026-11-09T04:40:17.753042+00:00",
-    "finished_at": "2026-11-09T04:40:17.758726+00:00"
+    "started_at": "2026-11-09T07:15:02.283303+00:00",
+    "finished_at": "2026-11-09T07:15:02.289033+00:00"
   },
   "cost": {
     "price_table_as_of": "2026-10-06",
@@ -1129,5 +1129,427 @@
     "ingest_tokens_per_1k_writes": null,
     "total_usd": 0.006378999999999999,
     "usd_per_1k_queries": 0.5799090909090909
-  }
+  },
+  "outcomes": {
+    "recall_precision": {
+      "4": true,
+      "5": true,
+      "9": true,
+      "10": true,
+      "13": true,
+      "14": true,
+      "16": true,
+      "17": true
+    },
+    "update_correctness": {
+      "9": true,
+      "10": true,
+      "13": true
+    },
+    "staleness": {
+      "9": true,
+      "13": true
+    },
+    "temporal_accuracy": {
+      "16": true,
+      "17": true
+    },
+    "forget_compliance": {
+      "21": true
+    },
+    "evidence_recall_at_k": {
+      "4": 1.0,
+      "5": 1.0,
+      "9": 1.0,
+      "10": 1.0,
+      "13": 1.0,
+      "14": 1.0,
+      "15": 1.0,
+      "16": 1.0,
+      "17": 1.0
+    },
+    "abstention": {
+      "18": true,
+      "21": false
+    },
+    "semantic_recall": {
+      "10": true,
+      "15": true
+    },
+    "contradiction_rate": {
+      "10": true,
+      "15": true
+    },
+    "qa_accuracy": {
+      "4": true,
+      "5": true,
+      "9": true,
+      "10": true,
+      "13": true,
+      "14": true,
+      "15": true,
+      "16": true,
+      "17": true
+    },
+    "token_cost": {
+      "4": 32,
+      "5": 32,
+      "9": 71,
+      "10": 71,
+      "13": 100,
+      "14": 100,
+      "15": 100,
+      "16": 100,
+      "17": 100,
+      "18": 100,
+      "21": 102
+    }
+  },
+  "stats": {
+    "scores": {
+      "recall_precision": {
+        "n": 8,
+        "ci": [
+          0.6755924351161198,
+          1.0
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "update_correctness": {
+        "n": 3,
+        "ci": [
+          0.4385029682449546,
+          1.0
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "staleness": {
+        "n": 2,
+        "ci": [
+          0.34238022750665303,
+          1.0
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "temporal_accuracy": {
+        "n": 2,
+        "ci": [
+          0.34238022750665303,
+          1.0
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "forget_compliance": {
+        "n": 1,
+        "ci": [
+          0.20654931437723745,
+          1.0
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "evidence_recall_at_k": {
+        "n": 9,
+        "ci": [
+          1.0,
+          1.0
+        ],
+        "method": "bootstrap",
+        "indicative": true
+      },
+      "abstention": {
+        "n": 2,
+        "ci": [
+          0.09453120573423074,
+          0.9054687942657693
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "semantic_recall": {
+        "n": 2,
+        "ci": [
+          0.34238022750665303,
+          1.0
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "contradiction_rate": {
+        "n": 2,
+        "ci": [
+          0.34238022750665303,
+          1.0
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "qa_accuracy": {
+        "n": 9,
+        "ci": [
+          0.7008549515804559,
+          1.0
+        ],
+        "method": "wilson",
+        "indicative": true
+      },
+      "token_cost": {
+        "n": 11,
+        "ci": [
+          66.63636363636364,
+          97.36363636363636
+        ],
+        "method": "bootstrap",
+        "indicative": true
+      },
+      "write_p50_ms": {
+        "n": 10,
+        "ci": null,
+        "method": null,
+        "indicative": false
+      },
+      "write_p95_ms": {
+        "n": 10,
+        "ci": null,
+        "method": null,
+        "indicative": true
+      },
+      "ingest_p50_ms": {
+        "n": 4,
+        "ci": null,
+        "method": null,
+        "indicative": false
+      },
+      "ingest_p95_ms": {
+        "n": 4,
+        "ci": null,
+        "method": null,
+        "indicative": true
+      },
+      "recall_p50_ms": {
+        "n": 11,
+        "ci": null,
+        "method": null,
+        "indicative": false
+      },
+      "recall_p95_ms": {
+        "n": 11,
+        "ci": null,
+        "method": null,
+        "indicative": true
+      },
+      "error_rate": {
+        "n": 22,
+        "ci": [
+          0.0,
+          0.14865487460862087
+        ],
+        "method": "wilson",
+        "indicative": true
+      }
+    },
+    "by_category": {
+      "abstention": {
+        "recall_precision": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "evidence_recall_at_k": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "semantic_recall": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "qa_accuracy": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        }
+      },
+      "forget": {
+        "recall_precision": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "evidence_recall_at_k": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "semantic_recall": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "qa_accuracy": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        }
+      },
+      "multi_hop": {
+        "recall_precision": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "evidence_recall_at_k": {
+          "n": 1,
+          "ci": [
+            1.0,
+            1.0
+          ],
+          "method": "bootstrap",
+          "indicative": true
+        },
+        "semantic_recall": {
+          "n": 1,
+          "ci": [
+            0.20654931437723745,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        },
+        "qa_accuracy": {
+          "n": 1,
+          "ci": [
+            0.20654931437723745,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        }
+      },
+      "single_hop": {
+        "recall_precision": {
+          "n": 3,
+          "ci": [
+            0.4385029682449546,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        },
+        "evidence_recall_at_k": {
+          "n": 3,
+          "ci": [
+            1.0,
+            1.0
+          ],
+          "method": "bootstrap",
+          "indicative": true
+        },
+        "semantic_recall": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "qa_accuracy": {
+          "n": 3,
+          "ci": [
+            0.4385029682449546,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        }
+      },
+      "temporal": {
+        "recall_precision": {
+          "n": 2,
+          "ci": [
+            0.34238022750665303,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        },
+        "evidence_recall_at_k": {
+          "n": 2,
+          "ci": [
+            1.0,
+            1.0
+          ],
+          "method": "bootstrap",
+          "indicative": true
+        },
+        "semantic_recall": {
+          "n": 0,
+          "ci": null,
+          "method": null,
+          "indicative": true
+        },
+        "qa_accuracy": {
+          "n": 2,
+          "ci": [
+            0.34238022750665303,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        }
+      },
+      "update": {
+        "recall_precision": {
+          "n": 3,
+          "ci": [
+            0.4385029682449546,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        },
+        "evidence_recall_at_k": {
+          "n": 3,
+          "ci": [
+            1.0,
+            1.0
+          ],
+          "method": "bootstrap",
+          "indicative": true
+        },
+        "semantic_recall": {
+          "n": 1,
+          "ci": [
+            0.20654931437723745,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        },
+        "qa_accuracy": {
+          "n": 3,
+          "ci": [
+            0.4385029682449546,
+            1.0
+          ],
+          "method": "wilson",
+          "indicative": true
+        }
+      }
+    }
+  },
+  "repeats": [],
+  "repeat_summary": null
 }

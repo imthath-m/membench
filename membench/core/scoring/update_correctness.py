@@ -10,6 +10,7 @@ updated is scored: does the recalled context contain the (updated)
 from __future__ import annotations
 
 from membench.core.runner import StepTrace
+from membench.core.stats import mean_of
 from membench.packs.schema import Pack, QueryStep, WriteStep
 
 _UPDATE_FACT_TYPES = {"update", "contradict"}
@@ -26,8 +27,13 @@ def update_correctness(pack: Pack, traces: list[StepTrace]) -> float | None:
     Returns None if the pack never queries a key after updating it (metric
     not applicable).
     """
+    return mean_of(update_correctness_outcomes(pack, traces))
+
+
+def update_correctness_outcomes(pack: Pack, traces: list[StepTrace]) -> dict[int, bool]:
+    """Pass/fail per post-update query, keyed by step index."""
     updated_keys: set[tuple[int, str]] = set()  # (episode, fact_key)
-    results: list[bool] = []
+    results: dict[int, bool] = {}
 
     for step, trace in zip(pack.steps, traces):
         if isinstance(step, WriteStep):
@@ -38,8 +44,5 @@ def update_correctness(pack: Pack, traces: list[StepTrace]) -> float | None:
             and (step.episode, step.expect_key) in updated_keys
             and step.expect_contains
         ):
-            results.append(_passes(step.expect_contains, trace.detail["context"]))
-
-    if not results:
-        return None
-    return sum(results) / len(results)
+            results[trace.step_index] = _passes(step.expect_contains, trace.detail["context"])
+    return results

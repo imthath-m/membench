@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 from membench.core.runner import StepTrace
 from membench.core.scoring.judge import JudgeError, parse_yes_no, record_judge_error
+from membench.core.stats import mean_of
 from membench.packs.schema import Pack, QueryStep
 
 if TYPE_CHECKING:
@@ -41,9 +42,15 @@ def _verdict(pack: Pack, step: QueryStep, answer: str, judge: Judge) -> Verdict:
 
 
 def qa_accuracy(pack: Pack, traces: list[StepTrace], judge: Judge | None) -> float | None:
+    return mean_of(qa_accuracy_outcomes(pack, traces, judge))
+
+
+def qa_accuracy_outcomes(
+    pack: Pack, traces: list[StepTrace], judge: Judge | None
+) -> dict[int, bool]:
     if judge is None:
-        return None
-    results: list[bool] = []
+        return {}
+    results: dict[int, bool] = {}
     for step, trace in zip(pack.steps, traces):
         if not (isinstance(step, QueryStep) and step.answer is not None):
             continue
@@ -53,14 +60,12 @@ def qa_accuracy(pack: Pack, traces: list[StepTrace], judge: Judge | None) -> flo
             continue
         answer = trace.detail["reader_answer"]
         if trace.error is not None or answer is None:
-            results.append(False)
+            results[trace.step_index] = False
             continue
         try:
             verdict = _verdict(pack, step, answer, judge)
         except JudgeError as exc:
             record_judge_error(trace.detail, "qa_accuracy", exc)
             continue
-        results.append(verdict.passed)
-    if not results:
-        return None
-    return sum(results) / len(results)
+        results[trace.step_index] = verdict.passed
+    return results

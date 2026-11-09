@@ -52,6 +52,10 @@ class RunResult:
     valid: bool = True
     manifest: dict[str, Any] = field(default_factory=dict)  # see core.manifest
     cost: dict[str, Any] | None = None  # see core.cost
+    outcomes: dict[str, dict[str, Any]] = field(default_factory=dict)  # per-query, see scoring
+    stats: dict[str, Any] = field(default_factory=dict)  # n / 95% CI / indicative per score
+    repeats: list[dict[str, Any]] = field(default_factory=list)  # reports of repeats 1..N-1
+    repeat_summary: dict[str, Any] | None = None  # mean / SD / values per score over repeats
 
 
 def _call_with_timeout(fn: Callable[[], Any], timeout: float | None) -> Any:
@@ -145,7 +149,7 @@ def run_pack(
     """
     from membench.core.cost import compute_cost
     from membench.core.manifest import build_manifest, seed_everything
-    from membench.core.scoring import score_all
+    from membench.core.scoring import score_detailed
 
     seed_everything(seed)
     started_at = datetime.now(timezone.utc).isoformat()
@@ -243,7 +247,8 @@ def run_pack(
     usage, _, _, _ = _run_step(adapter.usage, adapter, len(pack.steps), step_timeout)
     finished_at = datetime.now(timezone.utc).isoformat()
 
-    scores, by_category = score_all(pack, traces, judge)
+    scoring = score_detailed(pack, traces, judge, seed=seed)
+    scores = scoring.scores
     error_rate = scores["error_rate"]
     manifest = build_manifest(
         pack=pack, adapter=adapter, backend_name=backend_name, judge=judge,
@@ -269,8 +274,26 @@ def run_pack(
         traces=traces,
         scores=scores,
         usage=usage,
-        by_category=by_category,
+        by_category=scoring.by_category,
         valid=error_rate is None or error_rate <= MAX_ERROR_RATE,
         manifest=manifest,
         cost=cost,
+        outcomes=scoring.outcomes,
+        stats=scoring.stats,
     )
+
+
+def merge_repeats(results: list[RunResult]) -> RunResult:
+    """Fold repeats of one config into the first run's report.
+
+    The first run stays the top-level report; the others go in `repeats` (as
+    report dicts) and `repeat_summary` holds each score's mean, run-to-run SD
+    and per-repeat values.
+    """
+    from membench.core.stats import summarize_repeats
+
+    first = results[0]
+    if len(results) > 1:
+        first.repeats = [asdict(r) for r in results[1:]]
+        first.repeat_summary = summarize_repeats([r.scores for r in results])
+    return first

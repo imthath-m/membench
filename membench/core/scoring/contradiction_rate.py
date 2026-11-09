@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from membench.core.runner import StepTrace
 from membench.core.scoring.judge import JudgeError, record_judge_error
+from membench.core.stats import mean_of
 from membench.packs.schema import Pack, QueryStep
 
 if TYPE_CHECKING:
@@ -23,10 +24,16 @@ if TYPE_CHECKING:
 def contradiction_rate(
     pack: Pack, traces: list[StepTrace], judge: Judge | None
 ) -> float | None:
-    if judge is None:
-        return None
+    return mean_of(contradiction_rate_outcomes(pack, traces, judge))
 
-    results: list[bool] = []
+
+def contradiction_rate_outcomes(
+    pack: Pack, traces: list[StepTrace], judge: Judge | None
+) -> dict[int, bool]:
+    if judge is None:
+        return {}
+
+    results: dict[int, bool] = {}
     for step, trace in zip(pack.steps, traces):
         if isinstance(step, QueryStep) and step.judge and step.judge.contradiction:
             if trace.error is not None:  # nothing recalled to judge
@@ -36,8 +43,5 @@ def contradiction_rate(
             except JudgeError as exc:
                 record_judge_error(trace.detail, "contradiction_rate", exc)
                 continue
-            results.append(verdict.passed)  # passed == contradiction present
-
-    if not results:
-        return None
-    return sum(results) / len(results)
+            results[trace.step_index] = verdict.passed  # passed == contradiction present
+    return results

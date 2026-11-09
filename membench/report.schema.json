@@ -39,10 +39,73 @@
     },
     "valid": {"type": "boolean"},
     "manifest": {"$ref": "#/$defs/manifest"},
-    "cost": {"$ref": "#/$defs/cost"}
+    "cost": {"$ref": "#/$defs/cost"},
+    "outcomes": {
+      "description": "Per-query outcome of each query-level metric, keyed by step index.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "propertyNames": {"pattern": "^[0-9]+$"},
+        "additionalProperties": {"type": ["boolean", "number"]}
+      }
+    },
+    "stats": {
+      "type": "object",
+      "required": ["scores", "by_category"],
+      "additionalProperties": false,
+      "properties": {
+        "scores": {"type": "object", "additionalProperties": {"$ref": "#/$defs/stat"}},
+        "by_category": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object", "additionalProperties": {"$ref": "#/$defs/stat"}
+          }
+        }
+      }
+    },
+    "repeats": {
+      "description": "Full reports of repeats 1..N-1 of the same config (no nesting).",
+      "type": "array",
+      "items": {"$ref": "#", "properties": {"repeats": {"maxItems": 0}}}
+    },
+    "repeat_summary": {
+      "type": ["object", "null"],
+      "required": ["n", "scores"],
+      "additionalProperties": false,
+      "properties": {
+        "n": {"type": "integer", "minimum": 2},
+        "scores": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["mean", "sd", "values"],
+            "additionalProperties": false,
+            "properties": {
+              "mean": {"$ref": "#/$defs/maybe_number"},
+              "sd": {"$ref": "#/$defs/maybe_number"},
+              "values": {"type": "array", "items": {"$ref": "#/$defs/maybe_number"}}
+            }
+          }
+        }
+      }
+    }
   },
   "$defs": {
     "maybe_number": {"type": ["number", "null"]},
+    "stat": {
+      "description": "n, 95% CI ([low, high] or null) and its method; indicative = n below minimum.",
+      "type": "object",
+      "required": ["n", "ci", "method", "indicative"],
+      "additionalProperties": false,
+      "properties": {
+        "n": {"type": "integer", "minimum": 0},
+        "ci": {
+          "type": ["array", "null"], "items": {"type": "number"}, "minItems": 2, "maxItems": 2
+        },
+        "method": {"enum": ["wilson", "bootstrap", null]},
+        "indicative": {"type": "boolean"}
+      }
+    },
     "maybe_string": {"type": ["string", "null"]},
     "token_counts_or_null": {
       "type": ["object", "null"],

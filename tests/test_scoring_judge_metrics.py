@@ -40,8 +40,8 @@ def _query(judge_spec):
     return QueryStep(type="query", session_id="s1", query="q", timestamp="t", judge=judge_spec)
 
 
-def _query_trace(context):
-    return StepTrace(step_index=0, step_type="query", session_id="s1", latency_ms=1.0,
+def _query_trace(context, index=0):
+    return StepTrace(step_index=index, step_type="query", session_id="s1", latency_ms=1.0,
                      detail={"context": context})
 
 
@@ -62,7 +62,7 @@ def test_semantic_recall_scores_judged_queries():
         _query(JudgeSpec(semantic_recall="favorite color is green")),
         _query(JudgeSpec(semantic_recall="favorite color is green")),
     ])
-    traces = [_query_trace("color is green"), _query_trace("color is blue")]
+    traces = [_query_trace("color is green"), _query_trace("color is blue", 1)]
     assert semantic_recall(pack, traces, judge=StubJudge("green")) == 0.5
 
 

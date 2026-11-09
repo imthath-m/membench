@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 
 from membench.core.runner import StepTrace
+from membench.core.stats import mean_of
 from membench.packs.schema import Pack, QueryStep
 
 _ABSTAINS = re.compile(
@@ -23,14 +24,18 @@ def is_abstention(answer: str) -> bool:
 
 
 def abstention(pack: Pack, traces: list[StepTrace]) -> float | None:
-    results: list[bool] = []
+    return mean_of(abstention_outcomes(pack, traces))
+
+
+def abstention_outcomes(pack: Pack, traces: list[StepTrace]) -> dict[int, bool]:
+    results: dict[int, bool] = {}
     for step, trace in zip(pack.steps, traces):
         if not (isinstance(step, QueryStep) and step.abstain):
             continue
         if "reader_answer" not in trace.detail or "reader_error" in trace.detail:
             continue
         answer = trace.detail["reader_answer"]
-        results.append(trace.error is None and answer is not None and is_abstention(answer))
-    if not results:
-        return None
-    return sum(results) / len(results)
+        results[trace.step_index] = (
+            trace.error is None and answer is not None and is_abstention(answer)
+        )
+    return results

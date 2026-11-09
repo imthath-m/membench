@@ -19,9 +19,10 @@ from membench.core.runner import (
     DEFAULT_STEP_TIMEOUT_S,
     MAX_ERROR_RATE,
     StepTrace,
+    merge_repeats,
     run_pack,
 )
-from membench.core.scoring import score_all
+from membench.core.scoring import score_detailed
 from membench.core.scoring.judge import (
     API_KEY_ENV,
     DEFAULT_JUDGE_MODEL,
@@ -30,11 +31,12 @@ from membench.core.scoring.judge import (
     build_judge,
     resolve_client,
 )
+from membench.core.stats import summarize_repeats
 from membench.core.tokens import default_tokenizer
 from membench.datasets import DATASETS, SYNTHETIC, resolve_pack, select_queries
 from membench.generate.generator import GenerationError, generate_pack
 from membench.generate.synthetic import paraphrase_queries
-from membench.packs.schema import PackValidationError, QueryStep, pack_to_raw
+from membench.packs.schema import Pack, PackValidationError, QueryStep, pack_to_raw
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -130,8 +132,15 @@ def run(
     exclude_flagged: bool = _OPT["exclude_flagged"],
     limit: int = _OPT["limit"],
     sample: int = _OPT["sample"],
+    repeats: int = typer.Option(
+        None, "--repeats", min=1,
+        help="Run the pack N times, each on a fresh, reset backend namespace; the report holds "
+        "every repeat plus mean and SD. Default: 3 when the backend, judge or reader uses an "
+        "LLM, else 1.",
+    ),
     repeat_index: int = typer.Option(
-        0, "--repeat-index", help="Index of this run among repeats of the same config (recorded)."
+        0, "--repeat-index", help="Index of the (first) run among repeats of the same config "
+        "(recorded)."
     ),
     reader_model: str = typer.Option(
         None,
@@ -187,31 +196,43 @@ def run(
         else:
             reader = Reader(client)
 
-    try:
-        adapter = adapter_cls(adapter_config)
-        if reset:
-            adapter.reset()
-    except Exception as exc:  # missing extra, bad config, unreachable backend
-        typer.echo(f"Error: could not set up backend {backend!r}: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+    if repeats is None:
+        uses_llm = adapter_cls.uses_llm or judge_obj is not None or reader is not None
+        repeats = 3 if uses_llm else 1
+    results = []
+    for i in range(repeats):
+        config = dict(adapter_config)
+        if repeats > 1:  # a new namespace per repeat
+            config["namespace"] = f"{config.get('namespace', 'membench')}-r{repeat_index + i}"
+        try:
+            adapter = adapter_cls(config)
+            if reset:
+                adapter.reset()
+        except Exception as exc:  # missing extra, bad config, unreachable backend
+            typer.echo(f"Error: could not set up backend {backend!r}: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
 
-    try:
-        result = run_pack(
-            loaded_pack, adapter, backend_name=backend, judge=judge_obj,
-            step_timeout=step_timeout, seed=seed, repeat=repeat_index,
-            tokenizer=default_tokenizer(), reader=reader,
-        )
-    except CacheMissError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        try:
+            results.append(run_pack(
+                loaded_pack, adapter, backend_name=backend, judge=judge_obj,
+                step_timeout=step_timeout, seed=seed, repeat=repeat_index + i,
+                tokenizer=default_tokenizer(), reader=reader,
+            ))
+        except CacheMissError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+    result = merge_repeats(results)
     write_json(result, out)
     typer.echo(f"Wrote report for pack={loaded_pack.name!r} backend={backend!r} to {out}")
-    if not result.valid:
-        typer.echo(
-            f"Warning: run is invalid: error_rate {result.scores['error_rate']:.0%} "
-            f"is above {MAX_ERROR_RATE:.0%} (see trace `error` fields).",
-            err=True,
-        )
+    for r in results:
+        if not r.valid:
+            label = "run" if len(results) == 1 else f"repeat {r.manifest['repeat']}"
+            typer.echo(
+                f"Warning: {label} is invalid: error_rate "
+                f"{r.scores['error_rate']:.0%} is above {MAX_ERROR_RATE:.0%} "
+                "(see trace `error` fields).",
+                err=True,
+            )
 
 
 @app.command()
@@ -308,7 +329,8 @@ def rescore(
         help="Score without the dataset's flagged queries (shown as changes from the report).",
     ),
 ) -> None:
-    """Recompute scores from a report's traces and the judge cache (no adapter, no network).
+    """Recompute scores and CIs from a report's traces and the judge cache (no adapter, no
+    network). Repeats in the report are re-scored too.
 
     A dataset pack is rebuilt from the manifest (`dataset` + `pack.subset`);
     its cached download is needed, or network access to fetch it again.
@@ -340,15 +362,15 @@ def rescore(
                 model=judge_info["model"], base_url=judge_info["base_url"],
                 cache_path=judge_cache, strict=True,
             )
-        traces = [StepTrace(**t) for t in report_data["traces"]]
+        kept = None
         if exclude_flagged:  # score the same run without the flagged queries
             if loaded_pack.dataset is None or loaded_pack.subset is not None:
                 raise ValueError("--exclude-flagged needs a full (not --limit/--sample) "
                                  "dataset run")
             queries = {i for i, s in enumerate(loaded_pack.steps) if isinstance(s, QueryStep)}
             loaded_pack, kept = select_queries(loaded_pack, queries - set(loaded_pack.flagged))
-            traces = [traces[i] for i in kept]
-        scores, by_category = score_all(loaded_pack, traces, judge_obj)
+        runs = [report_data, *report_data.get("repeats", [])]
+        rescored = [_rescore_run(run, loaded_pack, judge_obj, kept) for run in runs]
     except (
         PackValidationError, ValueError, TypeError, KeyError, OSError, CacheMissError,
         yaml.YAMLError,
@@ -356,24 +378,23 @@ def rescore(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    diffs = {
-        name: (report_data["scores"].get(name), value)
-        for name, value in scores.items()
-        if report_data["scores"].get(name) != value
-    }
-    if report_data.get("by_category") != by_category:
-        diffs["by_category"] = (report_data.get("by_category"), by_category)
+    diffs = {}
+    for run, new in zip(runs, rescored):
+        prefix = f"repeat {run['manifest']['repeat']}: " if run is not report_data else ""
+        for name, value in new["scores"].items():
+            if run["scores"].get(name) != value:
+                diffs[prefix + name] = (run["scores"].get(name), value)
+        for key in ("by_category", "outcomes", "stats"):  # outcomes/stats: Phase 13+ reports
+            if (key == "by_category" or key in run) and run.get(key) != new[key]:
+                diffs[prefix + key] = (run.get(key), new[key])
     if out is not None:
-        error_rate = scores["error_rate"]
-        if exclude_flagged:
-            report_data["manifest"]["pack"]["sha256"] = loaded_pack.sha256
-            report_data["manifest"]["dataset"]["options"]["exclude_flagged"] = True
-        report_data.update(
-            traces=[asdict(t) for t in traces],
-            scores=scores,
-            by_category=by_category,
-            valid=error_rate is None or error_rate <= MAX_ERROR_RATE,
-        )
+        for run, new in zip(runs, rescored):
+            if exclude_flagged:
+                run["manifest"]["pack"]["sha256"] = loaded_pack.sha256
+                run["manifest"]["dataset"]["options"]["exclude_flagged"] = True
+            run.update(new)
+        if len(runs) > 1:
+            report_data["repeat_summary"] = summarize_repeats([new["scores"] for new in rescored])
         out.write_text(json.dumps(report_data, indent=2))
         typer.echo(f"Wrote re-scored report to {out}")
     if not diffs:
@@ -383,6 +404,23 @@ def rescore(
         typer.echo(f"Re-scored: {name} {old} -> {new}", err=True)
     if check:
         raise typer.Exit(code=1)
+
+
+def _rescore_run(run: dict, pack: Pack, judge: object, kept: list[int] | None) -> dict:
+    """Re-scored fields of one run (the report or one of its repeats)."""
+    traces = [StepTrace(**t) for t in run["traces"]]
+    if kept is not None:
+        traces = [traces[i] for i in kept]
+    scoring = score_detailed(pack, traces, judge, seed=run["manifest"].get("seed", 0))
+    error_rate = scoring.scores["error_rate"]
+    return {
+        "traces": [asdict(t) for t in traces],
+        "scores": scoring.scores,
+        "by_category": scoring.by_category,
+        "outcomes": scoring.outcomes,
+        "stats": scoring.stats,
+        "valid": error_rate is None or error_rate <= MAX_ERROR_RATE,
+    }
 
 
 def _builtin_pack_names() -> list[str]:

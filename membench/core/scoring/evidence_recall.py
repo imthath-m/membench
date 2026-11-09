@@ -9,16 +9,20 @@ a failed recall scores 0.
 from __future__ import annotations
 
 from membench.core.runner import StepTrace
+from membench.core.stats import mean_of
 from membench.packs.schema import Pack, QueryStep
 
 
 def evidence_recall_at_k(pack: Pack, traces: list[StepTrace]) -> float | None:
     """None if no query declares `evidence`."""
-    results: list[float] = []
+    return mean_of(evidence_recall_outcomes(pack, traces))
+
+
+def evidence_recall_outcomes(pack: Pack, traces: list[StepTrace]) -> dict[int, float]:
+    results: dict[int, float] = {}
     for step, trace in zip(pack.steps, traces):
         if isinstance(step, QueryStep) and step.evidence:
             recalled = {i for item in trace.detail["items"] for i in item["event_ids"]}
-            results.append(len(recalled.intersection(step.evidence)) / len(set(step.evidence)))
-    if not results:
-        return None
-    return sum(results) / len(results)
+            hit = len(recalled.intersection(step.evidence)) / len(set(step.evidence))
+            results[trace.step_index] = hit
+    return results
