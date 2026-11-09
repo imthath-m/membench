@@ -107,8 +107,12 @@ def test_mem0_platform_failed_event_fails_the_flush(tmp_path, monkeypatch):
 
 def test_mem0_platform_reset_moves_to_a_new_user(tmp_path, monkeypatch):
     adapter = FACTORIES["mem0-platform"](tmp_path, monkeypatch)
+    stale = {"id": "old", "memory": "My dog is called Rex.", "user_id": "membench-e1",
+             "metadata": {}}
+    adapter._client.memories.append(stale)  # an earlier run with the same namespace
     adapter.reset()
     assert adapter.user_id == "membench-e1"
+    assert adapter.recall("dog", session_id="s1", at=DAY2).context == ""
     retryable = pytest.importorskip("mem0.exceptions")
     assert retryable.RateLimitError in mem0_platform_module.Mem0PlatformAdapter.retryable
 

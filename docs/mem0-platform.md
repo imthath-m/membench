@@ -17,7 +17,7 @@ membench run --backend mem0-platform --pack mini --backend-config configs/defaul
 | `flush` | polls `GET /v1/event/<event_id>/` for every add until `SUCCEEDED` (`FAILED` fails the query) |
 | `recall` | `client.search(query, filters={"user_id": ...}, top_k=top_k)` |
 | `forget` | flushes, lists the user's memories (`get_all`), deletes those whose metadata names a target event |
-| `reset` | `delete_all(user_id=...)`, then switches to a new user_id |
+| `reset` | `delete_all(user_id=...)`, then switches to the next user_id and clears that one too (leftovers of an earlier run with the same namespace) |
 
 - **Async ingestion:** the v3 add endpoint queues the work and returns an
   `event_id`; memories exist only once the event has succeeded, so `flush()`
