@@ -28,7 +28,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from membench.datasets.fetch import Source
+from membench.datasets.download import Source
 
 _BASE = "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve"
 _REVISION = "98d7416c24c778c2fee6e6f3006e7a073259d48f"

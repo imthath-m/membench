@@ -346,6 +346,9 @@ def rescore(
             )
         traces = [StepTrace(**t) for t in report_data["traces"]]
         if exclude_flagged:  # score the same run without the flagged queries
+            if loaded_pack.dataset is None or loaded_pack.subset is not None:
+                raise ValueError("--exclude-flagged needs a full (not --limit/--sample) "
+                                 "dataset run")
             queries = {i for i, s in enumerate(loaded_pack.steps) if isinstance(s, QueryStep)}
             loaded_pack, kept = select_queries(loaded_pack, queries - set(loaded_pack.flagged))
             traces = [traces[i] for i in kept]

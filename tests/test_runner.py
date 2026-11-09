@@ -224,3 +224,14 @@ def test_ingest_tokens_exclude_tokens_spent_in_recall():
 
     assert result.usage == {"llm_input_tokens": 210}
     assert result.cost["ingest_tokens_per_1k_writes"] == 200 / 2 * 1000
+
+
+def test_reader_uses_the_packs_qa_style():
+    from membench.core.reader import Reader
+
+    client = StubReaderClient()
+    pack = _pack([_w("e1"), {**_q("2025-05-01T00:00:00+00:00"), "query": "gold?", "answer": "x"}])
+    pack.qa_style = "longmemeval"
+    run_pack(pack, RecordingAdapter(), backend_name="rec", reader=Reader(client))
+    assert client.prompts[0].startswith("I will give you several history chats")
+    assert "Current Date: 2025/05/01 (Thu) 00:00\nQuestion: gold?" in client.prompts[0]

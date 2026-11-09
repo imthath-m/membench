@@ -1,0 +1,41 @@
+[
+  {
+    "sample_id": "conv-a",
+    "conversation": {
+      "speaker_a": "Ana",
+      "speaker_b": "Ben",
+      "session_1_date_time": "1:56 pm on 8 May, 2023",
+      "session_1": [
+        {"speaker": "Ana", "dia_id": "D1:1", "text": "I started pottery classes last week."},
+        {"speaker": "Ben", "dia_id": "D1:2", "text": "Cool! Look at my new kayak.", "blip_caption": "a photo of a red kayak"}
+      ],
+      "session_2_date_time": "10:00 am on 20 June, 2023",
+      "session_2": [
+        {"speaker": "Ana", "dia_id": "D2:1", "text": "I made my first bowl in pottery."},
+        {"speaker": "Ben", "dia_id": "D2:2", "text": "I'm moving to Porto in August."}
+      ]
+    },
+    "qa": [
+      {"question": "What class did Ana start?", "answer": "pottery", "evidence": ["D1:1"], "category": 4},
+      {"question": "What did Ana make after starting her class?", "answer": "a bowl", "evidence": ["D1:1; D2:1"], "category": 1},
+      {"question": "When is Ben moving?", "answer": 2023, "evidence": ["D:2:02"], "category": 2},
+      {"question": "What colour is Ana's kayak?", "evidence": ["D1:2"], "category": 5, "adversarial_answer": "red"},
+      {"question": "Would Ben enjoy the sea?", "answer": "Likely yes", "evidence": ["D9:9"], "category": 3}
+    ]
+  },
+  {
+    "sample_id": "conv-b",
+    "conversation": {
+      "speaker_a": "Cy",
+      "speaker_b": "Di",
+      "session_1_date_time": "8:05 pm on 1 January, 2024",
+      "session_1": [
+        {"speaker": "Cy", "dia_id": "D1:1", "text": "Happy new year! I'm learning Spanish."},
+        {"speaker": "Di", "dia_id": "D1:2", "text": "Me too, but Italian."}
+      ]
+    },
+    "qa": [
+      {"question": "Which language is Di learning?", "answer": "Italian", "evidence": ["D1:2"], "category": 4}
+    ]
+  }
+]

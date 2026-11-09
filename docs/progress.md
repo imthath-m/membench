@@ -104,13 +104,13 @@ Status: done (with blocked items)
 
 ## Phase 12 — Datasets: public loaders + harder synthetic packs
 Status: in progress
-- [ ] `membench/datasets/` loader core: pinned revision download, sha256 check, cache under `~/.cache/membench`, in-memory `Pack`; manifest `dataset`; `rescore` loader hook
-- [ ] `membench convert` writes YAML locally (inspection only)
-- [ ] LongMemEval loader (S / M / oracle) + official judge prompt for QA accuracy
+- [x] `membench/datasets/` loader core: pinned revision download, sha256 check, cache under `~/.cache/membench`, in-memory `Pack`; manifest `dataset`; `rescore` loader hook
+- [x] `membench convert` writes YAML locally (inspection only)
+- [x] LongMemEval loader (S / M / oracle) + official judge prompt for QA accuracy
 - [ ] LoCoMo loader (adversarial → abstain) + gold-answer exclusion list; scores with and without it
-- [ ] `--limit` / `--sample N --seed` stratified subsets
-- [ ] Synthetic generator v2 (seeded, template-based; sessions, distractors, update chains, time gaps, multi-hop, abstention, forget; optional LLM paraphrase pass)
-- [ ] Packs ≥200 queries, ≥30 per category: `tool_call_memory`, `document_chain`, `multi_step_decisions`, scaled `customer_support` / `coding_assistant`; byte-identical per seed
+- [x] `--limit` / `--sample N --seed` stratified subsets
+- [x] Synthetic generator v2 (seeded, template-based; sessions, distractors, update chains, time gaps, multi-hop, abstention, forget; optional LLM paraphrase pass)
+- [x] Packs ≥200 queries, ≥30 per category: `tool_call_memory`, `document_chain`, `multi_step_decisions`, scaled `customer_support` / `coding_assistant`; byte-identical per seed
 - [ ] Tests (fixtures only, no dataset content) + README docs
 - [ ] LongMemEval_S and LoCoMo end-to-end on `full-context` and `chroma`
 - [ ] Full-context oracle QA accuracy within ±3pp of the paper

@@ -211,3 +211,47 @@ def test_score_all_breakdown_keeps_updates_in_scope():
     assert by_category["uncategorized"]["recall_precision"] == 1.0
     assert by_category["uncategorized"]["evidence_recall_at_k"] == 0.75
     assert scores["staleness"] == 0.0
+
+
+class YesNoJudge:
+    """Records official-style prompts; says yes when the response says 'Dana'
+    or (abstention prompt) 'not know'."""
+
+    model = "stub"
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def ask(self, prompt, parse):
+        self.prompts.append(prompt)
+        response = prompt.split("Model Response: ")[1].split("\n\n")[0]
+        return parse("yes" if "Dana" in response or "not know" in response else "no")
+
+
+LME_PACK = parse_pack({"steps": [
+    _w("a", "name", "My name is Dana."),
+    _q("Name?", answer="Dana", category="knowledge-update"),
+    _q("Cat?", answer="Only a name was given.", abstain=True, category="single-session-user"),
+]})
+
+
+def test_qa_accuracy_longmemeval_style_uses_official_prompts_and_scores_abstain():
+    LME_PACK.qa_style = "longmemeval"
+    traces = _traces(LME_PACK, [
+        ("Dana", [], {"reader_answer": "Dana"}),
+        ("Dana", [], {"reader_answer": "I do not know"}),
+    ])
+    judge = YesNoJudge()
+    assert qa_accuracy(LME_PACK, traces, judge) == 1.0
+    assert "updated answer is the required answer" in judge.prompts[0]
+    assert "Explanation: Only a name was given." in judge.prompts[1]
+
+
+def test_qa_accuracy_default_style_leaves_abstain_queries_to_abstention():
+    pack = parse_pack({"steps": [
+        _w("a", "name", "My name is Dana."),
+        _q("Cat?", answer="Only a name was given.", abstain=True),
+    ]})
+    traces = _traces(pack, [("Dana", [], {"reader_answer": "I don't know"})])
+    assert qa_accuracy(pack, traces, AnswerJudge()) is None
+    assert abstention(pack, traces) == 1.0
