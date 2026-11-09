@@ -560,8 +560,9 @@ def judge_sample(
     try:
         for path in in_paths:
             report_data = json.loads(path.read_text())
+            loaded_pack = _report_pack(report_data, path)
             model = (report_data["manifest"].get("judge") or {}).get("model") or judge_model
-            items += judge_items(report_data, _report_pack(report_data, path), cache, model)
+            items += judge_items(report_data, loaded_pack, cache, model)
     except (PackValidationError, ValueError, TypeError, KeyError, OSError,
             yaml.YAMLError) as exc:
         typer.echo(f"Error: {exc}", err=True)

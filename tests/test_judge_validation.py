@@ -270,6 +270,13 @@ def test_judge_items_take_cached_verdicts(tmp_path):
     assert items[1]["verdict"] is None
 
 
+def test_judge_items_ignore_the_runs_own_judge_errors():
+    pack, report = _synthetic_report(1)
+    expected = judge_items(report, pack)
+    report["traces"][0]["detail"]["judge_error"] = {"semantic_recall": "old failure"}
+    assert judge_items(report, pack) == expected
+
+
 def test_qa_items_use_reader_answers_and_longmemeval_prompts():
     class Client:
         model, base_url = "reader", None

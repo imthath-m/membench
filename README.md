@@ -236,8 +236,9 @@ Both are built in memory; nothing is written to disk or committed.
 - **Synthetic:** a deterministic, template-based generator (no LLM): per
   simulated user, facts spread over 4 sessions days to weeks apart with
   filler turns, an update chain A→B→C, a multi-hop pair, a temporal "as of"
-  question, an unstated fact (abstention) and a forgotten one. Same seed,
-  same bytes; `--pack-seed` picks another draw. Knobs: `generate/synthetic.py`
+  question, an unstated fact (abstention) and a forgotten one. Answerable
+  queries carry a `semantic_recall` judge rubric, update queries a
+  `contradiction` rubric (generator v2). Same seed, same bytes; `--pack-seed` picks another draw. Knobs: `generate/synthetic.py`
   `Knobs`; templates: `generate/domains.py`.
 - **Inspect:** `membench convert --pack locomo --out locomo.yaml` writes any
   pack as YAML (local inspection only). `--paraphrase-model <model>` rewrites
