@@ -4,6 +4,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | Phase | Branch | PR | Status |
 |---|---|---|---|
 | 8 | claude/gracious-edison-v8eyxs | #6 | done (live run blocked) |
+| 9 | claude/gracious-edison-v8eyxs-phase-9 | — | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -24,3 +25,20 @@ Status: done (with blocked items)
   - Judge parse-retry and shape handling live in `CachedJudge`; a bare client's `score()` still raises. HTTP errors after the judge's own 429/5xx retries still stop the run (not in Phase 8 scope).
   - The judge's `_post_with_retry` was left as is (status-code based, honours `Retry-After`); `core/retry.py` is exception based, for adapters.
   - Newer ruff (0.17) enables extra default rules (e.g. BLE001, UP035); CI installs the latest ruff, so lint with a current version.
+
+## Phase 9 — Adapter contract v2 (breaking, bump to 0.2)
+Status: in progress
+- [ ] Split identity: `Event.id` (unique, opaque) is the only id adapters see; pack `fact_key` used only for scoring (fixes Chroma overwrite leak)
+- [ ] `recall(query, *, session_id, at)`
+- [ ] `flush()` (default no-op); runner calls it before a query that follows writes, records `ingest_latency_ms`
+- [ ] `RecallResult.items` → `list[RecalledItem(event_ids, text, score)]`; adapters map ids back to `Event.id`
+- [ ] Token counting in the runner (configured tokenizer); `RecallResult.token_count` removed
+- [ ] Optional `usage()` (cumulative backend LLM/embedding tokens)
+- [ ] `forget` step type (`target: <event id(s)>`); runner calls `adapter.forget`
+- [ ] Episodes: pack holds one or more `episodes`, `reset()` between them
+- [ ] Port all 3 adapters; README documents the contract; version 0.2.0
+- [ ] Test: every file in `membench/adapters/` < 100 lines
+- [ ] Test: update-resolution pack (distinct ids, no `fact_key` reaches adapters, Chroma context holds both values) on all 3 adapters
+- [ ] Test: Chroma `update_correctness` no longer 1.0 by construction (regression)
+- [ ] Test: runner `forget` step reaches `adapter.forget` with target ids, traced with latency
+- [ ] Test: pack with a `forget` step and two episodes runs on all 3 adapters
