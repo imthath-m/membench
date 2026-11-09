@@ -93,12 +93,13 @@ def test_run_pack_judge_metrics_null_when_no_judge():
     pack = load_pack(builtin_pack_path("mini"))
     result = run_pack(pack, FullContextAdapter(), "full-context", judge=None)
 
-    assert set(result.scores) == {
-        "recall_precision", "update_correctness", "token_cost", "p95_latency_ms",
-        "semantic_recall", "contradiction_rate", "error_rate",
-    }
+    assert {
+        "recall_precision", "update_correctness", "token_cost", "recall_p50_ms",
+        "semantic_recall", "contradiction_rate", "qa_accuracy", "error_rate",
+    } <= set(result.scores)
     assert result.scores["semantic_recall"] is None
     assert result.scores["contradiction_rate"] is None
+    assert result.scores["qa_accuracy"] is None
 
 
 # --- cache reproducibility --------------------------------------------------

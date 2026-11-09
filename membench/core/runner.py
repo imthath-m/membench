@@ -48,6 +48,7 @@ class RunResult:
     traces: list[StepTrace] = field(default_factory=list)
     scores: dict[str, Any] = field(default_factory=dict)
     usage: dict[str, int] | None = None  # adapter.usage(): backend LLM/embedding tokens
+    by_category: dict[str, dict[str, Any]] = field(default_factory=dict)  # per query category
     valid: bool = True
     manifest: dict[str, Any] = field(default_factory=dict)  # see core.manifest
     cost: dict[str, Any] | None = None  # see core.cost
@@ -109,6 +110,15 @@ def _run_step(
     return result, latency_ms, retries, error
 
 
+def _usage_total(adapter: MemoryAdapter) -> int | None:
+    """Sum of the adapter's cumulative token counts (None if not tracked)."""
+    try:
+        usage = adapter.usage()
+    except Exception:  # noqa: BLE001 - usage is best effort; the final read records errors
+        return None
+    return None if usage is None else sum(usage.values())
+
+
 def run_pack(
     pack: Pack,
     adapter: MemoryAdapter,
@@ -118,6 +128,7 @@ def run_pack(
     tokenizer: Callable[[str], int] = count_tokens,
     seed: int = 0,
     repeat: int = 0,
+    reader: Any = None,
 ) -> RunResult:
     """Replay every step in `pack` against `adapter` in order.
 
@@ -128,16 +139,19 @@ def run_pack(
     step of that episode is recorded as an error. `adapter.flush()` runs
     before a query that follows writes or forgets, timed as `ingest_latency_ms`.
     `seed` seeds every seedable RNG first; it and `repeat` (the repeat index)
-    are recorded in the run manifest.
+    are recorded in the run manifest. `reader` is an optional
+    `core.reader.Reader`: it answers each query that has a gold `answer` or
+    `abstain`, from the recalled context (`detail.reader_answer`).
     """
     from membench.core.cost import compute_cost
     from membench.core.manifest import build_manifest, seed_everything
-    from membench.core.scoring import score_run
+    from membench.core.scoring import score_all
 
     seed_everything(seed)
     started_at = datetime.now(timezone.utc).isoformat()
     traces: list[StepTrace] = []
     episode, reset_error, pending_ingest = 0, None, False
+    recall_tokens = 0  # backend tokens spent inside recall() (the rest is ingest)
 
     for index, step in enumerate(pack.steps):
         if step.episode != episode:
@@ -181,11 +195,15 @@ def run_pack(
                 pending_ingest = False
                 error = error and f"flush: {error}"
             if error is None:
+                before = _usage_total(adapter)
                 result, latency_ms, retries, error = call(
                     lambda step=step: adapter.recall(
                         step.query, session_id=step.session_id, at=step.timestamp
                     )
                 )
+                after = _usage_total(adapter)
+                if before is not None and after is not None:
+                    recall_tokens += after - before
             if result is None:  # failed step: nothing was recalled
                 result = RecallResult(context="")
             detail = {
@@ -196,8 +214,18 @@ def run_pack(
                 "ingest_latency_ms": ingest_ms,
                 "expect_contains": step.expect_contains,
                 "expect_key": step.expect_key,
+                "category": step.category,
                 "retries": retries,
             }
+            if reader is not None and (step.answer is not None or step.abstain):
+                detail["reader_answer"] = None
+                if error is None:
+                    try:
+                        detail["reader_answer"] = reader.answer(
+                            step.query, result.context, step.timestamp
+                        )
+                    except Exception as exc:  # noqa: BLE001 - recorded, query not scored
+                        detail["reader_error"] = f"{type(exc).__name__}: {exc}"
         else:  # pragma: no cover - schema guarantees this can't happen
             raise TypeError(f"unknown step type: {step!r}")
         traces.append(
@@ -215,12 +243,12 @@ def run_pack(
     usage, _, _, _ = _run_step(adapter.usage, adapter, len(pack.steps), step_timeout)
     finished_at = datetime.now(timezone.utc).isoformat()
 
-    scores = score_run(pack, traces, judge)
+    scores, by_category = score_all(pack, traces, judge)
     error_rate = scores["error_rate"]
     manifest = build_manifest(
         pack=pack, adapter=adapter, backend_name=backend_name, judge=judge,
         tokenizer=tokenizer, seed=seed, repeat=repeat,
-        started_at=started_at, finished_at=finished_at,
+        started_at=started_at, finished_at=finished_at, reader=reader,
     )
     cost = compute_cost(
         judge_model=getattr(judge, "model", None),
@@ -228,6 +256,10 @@ def run_pack(
         backend_models=manifest["backend"]["models"],
         backend_usage=usage,
         n_queries=sum(t.step_type == "query" for t in traces),
+        n_writes=sum(t.step_type == "write" for t in traces),
+        recall_tokens=recall_tokens,
+        reader_model=getattr(reader, "model", None),
+        reader_usage=getattr(reader, "usage", None),
     )
     return RunResult(
         pack_name=pack.name,
@@ -237,6 +269,7 @@ def run_pack(
         traces=traces,
         scores=scores,
         usage=usage,
+        by_category=by_category,
         valid=error_rate is None or error_rate <= MAX_ERROR_RATE,
         manifest=manifest,
         cost=cost,

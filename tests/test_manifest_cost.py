@@ -46,7 +46,7 @@ def test_manifest_records_inputs():
     assert manifest["judge"] == {
         "model": "stub-model", "base_url": None, "prompt_version": JUDGE_PROMPT_VERSION,
     }
-    assert manifest["tokenizer"] == "membench.core.tokens.count_tokens"
+    assert manifest["tokenizer"] == "whitespace:approx"
     assert (manifest["seed"], manifest["repeat"]) == (7, 2)
     assert manifest["started_at"] == result.started_at
     assert manifest["membench"]["git_commit"] is None or len(manifest["membench"]["git_commit"]) == 40

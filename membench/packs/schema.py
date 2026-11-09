@@ -10,6 +10,12 @@ the runner calls `reset()` between episodes. Each step is one of:
     this write supersedes a prior fact under the same `fact_key`.
   - a `query`: ask a question, with expected-fact assertions
     (`expect_contains`, `expect_key` — a `fact_key`) scored by `core.scoring`.
+    Optional: `category` (`single_hop`, `multi_hop`, `temporal`, `update`,
+    `abstention`, `forget`, …) for the per-category breakdown; `answer` (the
+    gold answer a reader's reply is judged against); `expect_absent` (stale or
+    forgotten strings the context must not contain); `evidence` (ids of the
+    earlier writes that answer it); `abstain: true` (no answer exists, the
+    reader should say it doesn't know).
   - a `forget`: remove earlier writes by id (`target: <id or list of ids>`).
 """
 
@@ -68,6 +74,11 @@ class QueryStep:
     expect_key: str | None = None
     judge: JudgeSpec | None = None
     episode: int = 0
+    category: str | None = None
+    answer: str | None = None
+    expect_absent: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    abstain: bool = False
 
 
 @dataclass
@@ -138,6 +149,8 @@ def _parse_step(raw: dict, index: int, episode: int) -> Step:
             episode=episode,
         )
     if step_type == "query":
+        if raw.get("abstain") and raw.get("answer") is not None:
+            raise PackValidationError(f"step {index}: an 'abstain' query has no 'answer'")
         return QueryStep(
             type="query",
             session_id=_require(raw, "session_id", index),
@@ -147,6 +160,11 @@ def _parse_step(raw: dict, index: int, episode: int) -> Step:
             expect_key=raw.get("expect_key"),
             judge=_parse_judge(raw.get("judge"), index),
             episode=episode,
+            category=raw.get("category"),
+            answer=raw.get("answer"),
+            expect_absent=raw.get("expect_absent", []) or [],
+            evidence=[str(e) for e in raw.get("evidence", []) or []],
+            abstain=bool(raw.get("abstain", False)),
         )
     if step_type == "forget":
         target = _require(raw, "target", index)
@@ -163,20 +181,34 @@ def _parse_step(raw: dict, index: int, episode: int) -> Step:
 
 
 def _check_ids(steps: list[Step]) -> None:
-    """Event ids are unique; a forget targets an earlier write in its episode."""
+    """Event ids are unique; a forget target or query `evidence` is an earlier
+    write in its episode; a `forget`-category query follows a forget."""
     seen: dict[str, int] = {}  # event id -> episode
+    forgot: set[int] = set()  # episodes with a forget so far
     for index, step in enumerate(steps):
         if isinstance(step, WriteStep):
             if step.id in seen:
                 raise PackValidationError(f"step {index}: duplicate event id {step.id!r}")
             seen[step.id] = step.episode
         elif isinstance(step, ForgetStep):
+            forgot.add(step.episode)
             for target in step.target:
                 if seen.get(target) != step.episode:
                     raise PackValidationError(
                         f"step {index}: forget target {target!r} is not an earlier write "
                         "in this episode"
                     )
+        else:
+            for event_id in step.evidence:
+                if seen.get(event_id) != step.episode:
+                    raise PackValidationError(
+                        f"step {index}: evidence {event_id!r} is not an earlier write "
+                        "in this episode"
+                    )
+            if step.category == "forget" and step.episode not in forgot:
+                raise PackValidationError(
+                    f"step {index}: a 'forget' query must follow a forget step in its episode"
+                )
 
 
 def parse_pack(raw: Any, default_name: str = "pack") -> Pack:

@@ -103,4 +103,5 @@ def test_step_timeout_records_error(mini):
     queries = _queries(result)
     assert all(q.error == "TimeoutError: step exceeded 0.05s timeout" for q in queries)
     assert all(t.error is None for t in result.traces if t.step_type == "write")
-    assert result.scores["p95_latency_ms"] < 50  # timed-out steps are excluded
+    assert result.scores["recall_p50_ms"] is None  # timed-out steps are excluded
+    assert result.scores["write_p50_ms"] < 50
