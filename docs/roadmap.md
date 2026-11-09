@@ -10,7 +10,7 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - **Fairness leak:** the pack's `key` is the fact id used for scoring. `ChromaAdapter.write` uses it as the document id (`upsert(ids=[event.key])`), so an update overwrites the stale value. Chroma's `update_correctness` is unearned.
 - **Metrics:** 6. `token_cost` is a whitespace word count (`core/tokens.py`), computed inside each adapter, which goes against the "runner owns token accounting" rule. `p95_latency_ms` pools writes and queries over at most 16 steps, so it is close to the max.
 - **Missing PRD metrics:** temporal reasoning, staleness.
-- **Judge:** yes/no prompt (`build_prompt`), Anthropic by default plus an OpenAI-compatible client, cached by (model, prompt hash). Prompt version is not recorded; `usage` is thrown away; a malformed reply (`parse_verdict` raising `ValueError`) stops the run.
+- **Judge:** yes/no prompt (`build_prompt`), Anthropic by default plus an OpenAI-compatible client, cached by (model, prompt hash). Prompt version is not recorded; `usage` is thrown away; a malformed reply (`parse_verdict` raising `ValueError`) or an unexpected response shape (`complete()` indexing into the reply and raising `KeyError`, `IndexError` or `TypeError`) stops the run.
 - **Robustness:** any adapter exception stops the run and no report is written. Mem0's own OpenAI calls are not retried. There are no step timeouts.
 - **Missing extra:** `adapter_cls(adapter_config)` in `cli.py run` sits outside the `try`, so a missing `mem0ai` prints a traceback. README and `docs/mem0.md` claim a clean error.
 - **Report:** `asdict(RunResult)`. No schema version, manifest, judge model, or config.
@@ -23,7 +23,7 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - **`forget()` is never exercised:** the runner handles `write` and `query` steps only. → Phase 9
 - **Packs are tiny, with no timestamps:** 4/7/7 queries; events default to 1 second apart. → Phase 11 (timestamps), Phase 12 (size)
 - **Missing extra prints a traceback:** the adapter is built outside the CLI's `try`, against the README and `docs/mem0.md`. → Phase 8
-- **A malformed judge reply aborts the run:** `parse_verdict` raises `ValueError`. → Phase 8
+- **A malformed judge reply or unexpected response shape aborts the run:** `parse_verdict` raises `ValueError`; both clients' `complete()` raise `KeyError`, `IndexError` or `TypeError` on a missing `content` / `choices`. → Phase 8
 
 ## Guiding constraints (carried over, plus additions)
 
@@ -44,8 +44,8 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - Runner-level retry: shared `core/retry.py` with exponential backoff and jitter. Adapters can declare a `retryable` exception tuple (e.g. `openai.RateLimitError`, `APITimeoutError`), which covers Mem0's internal LLM calls.
 - Per-step timeout (`--step-timeout`, default 120s).
 - Per-step error capture: a failed step is written to the trace as `error`, the run continues, and the report gains `error_rate`. A run whose `error_rate` is above a threshold is marked invalid.
-- Judge: a reply that fails to parse is retried once, then recorded as a `judge_error` instead of stopping the run.
-- Tests for the judge and the CLI: a malformed judge reply (no JSON, bad JSON) is recorded per query as `judge_error` and the other queries still score; `mem0` blocked from import gives the one-line error.
+- Judge: a reply that fails to parse is retried once, then recorded as a `judge_error` instead of stopping the run. An unexpected response shape from either client's `complete()` (`KeyError`, `IndexError`, `TypeError`) is also recorded as `judge_error`, with no retry.
+- Tests for the judge and the CLI: a malformed judge reply (no JSON, bad JSON) is recorded per query as `judge_error` and the other queries still score; a stubbed client returning an unexpected shape (e.g. no `choices`) finishes the run and records that query as `judge_error`; `mem0` blocked from import gives the one-line error.
 - CI: add a `chroma` job so its adapter tests run.
 - CI: `live.yml` (manual dispatch only, secret-gated) runs `mini` against `mem0` with the judge on.
 
@@ -53,7 +53,7 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - `membench run --backend mem0` without `mem0ai` prints a one-line actionable error with exit code 1 (tested).
 - A live `mem0` + judge run of `customer-support` completes; any injected 429 is retried and logged.
 - A forced adapter exception mid-pack still produces a valid report with the error recorded.
-- A pack with one malformed judge reply still finishes; that query is recorded as `judge_error` and the rest are scored (tested).
+- A pack with one malformed judge reply or unexpected response shape still finishes; that query is recorded as `judge_error` and the rest are scored (tested).
 
 ## Phase 9 — Adapter contract v2 (breaking, bump to 0.2)
 
