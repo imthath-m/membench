@@ -52,6 +52,11 @@ membench run --backend mem0 --pack customer-support \
   --out report.json
 ```
 
-If `mem0ai` isn't installed, `membench run --backend mem0 ...` fails with
-a clear error asking you to `pip install membench[mem0]` instead of
-crashing with an `ImportError` traceback.
+If `mem0ai` isn't installed, `membench run --backend mem0 ...` prints a
+one-line `Error:` asking you to `pip install membench[mem0]` and exits with
+code 1 (no traceback).
+
+OpenAI rate-limit, timeout and connection errors raised from Mem0's own
+LLM/embedder calls are retried by the runner with exponential backoff; each
+retry is logged. A step that still fails is recorded as an `error` in the
+trace and the run continues (see the README's "Failures during a run").

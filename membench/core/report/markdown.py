@@ -8,6 +8,8 @@ reports become a side-by-side backend/pack comparison, one column each.
 
 from __future__ import annotations
 
+from membench.core.runner import MAX_ERROR_RATE
+
 # (key, human label, kind) — `kind` drives value formatting. `ratio` metrics
 # live in 0..1 and render as percentages; everything else is a plain number.
 _METRICS: list[tuple[str, str, str]] = [
@@ -17,6 +19,7 @@ _METRICS: list[tuple[str, str, str]] = [
     ("contradiction_rate", "Contradiction rate", "ratio"),
     ("token_cost", "Token cost (avg tokens/query)", "number"),
     ("p95_latency_ms", "p95 latency (ms)", "number"),
+    ("error_rate", "Error rate", "ratio"),
 ]
 
 _METRIC_NOTES: dict[str, str] = {
@@ -26,6 +29,10 @@ _METRIC_NOTES: dict[str, str] = {
     "contradiction_rate": "judge rate of contradictions in recall (n/a when judge is off)",
     "token_cost": "mean recalled-context tokens per query",
     "p95_latency_ms": "95th-percentile per-step latency in milliseconds",
+    "error_rate": (
+        "fraction of steps that failed or timed out "
+        f"(run invalid above {MAX_ERROR_RATE:.0%})"
+    ),
 }
 
 
@@ -39,6 +46,10 @@ def _fmt_value(kind: str, value: object) -> str:
 
 def _count_queries(report: dict) -> int:
     return sum(1 for t in report.get("traces", []) if t.get("step_type") == "query")
+
+
+def _fmt_valid(report: dict) -> str:
+    return "yes" if report.get("valid", True) else "no (error rate above threshold)"
 
 
 def _label(report: dict) -> str:
@@ -66,6 +77,7 @@ def _render_single(report: dict) -> str:
             f"- **Steps:** {len(report.get('traces', []))} "
             f"({_count_queries(report)} queries)"
         ),
+        f"- **Valid:** {_fmt_valid(report)}",
         "",
         "## Scores",
         "",

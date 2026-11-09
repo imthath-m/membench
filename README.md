@@ -89,11 +89,32 @@ no vendor dep), `chroma` (local vector store, no vendor dep), `mem0`
 Pass adapter config with `--backend-config path.yaml` (JSON or YAML mapping,
 merged over `{"persist_dir": --persist-dir}`). Each run starts clean: the
 adapter's `reset()` clears state left by earlier runs (chroma collection,
-mem0 `user_id`); pass `--no-reset` to keep it.
+mem0 `user_id`); pass `--no-reset` to keep it. If the backend can't be set up
+(e.g. its extra isn't installed), `membench run` prints a one-line `Error:`
+and exits with code 1.
+
+### Failures during a run
+
+A run never stops on a single bad step:
+
+- Adapter calls that raise one of the adapter's `retryable` exceptions
+  (e.g. Mem0's OpenAI rate-limit / timeout errors) are retried with
+  exponential backoff and jitter; each retry is logged and counted in the
+  step's trace (`detail.retries`).
+- Each write/recall is capped by `--step-timeout` (default 120s, retries
+  included).
+- A step that still fails or times out is recorded in its trace's `error`
+  and the run continues. A failed query recalls nothing, so it counts as a
+  miss for accuracy metrics; it's excluded from `token_cost` and latency.
+  The report's `error_rate` is the fraction of failed steps; above 10% the
+  run is marked `"valid": false`.
+- A judge reply that fails to parse is retried once; if it still fails, or
+  the response has an unexpected shape, that query's trace records a
+  `judge_error` and it's left out of that judge metric.
 
 ## Metric definitions
 
-All six appear in every JSON report's `scores` block; `null` means the
+All six, plus `error_rate`, appear in every JSON report's `scores` block; `null` means the
 pack (or the run config) didn't exercise that metric.
 
 - **`recall_precision`** — fraction of queries with an `expect_contains`
@@ -108,7 +129,7 @@ pack (or the run config) didn't exercise that metric.
   query steps (from `RecallResult.token_count`, i.e. exactly what would be
   billed as prompt tokens). Lower is cheaper.
 - **`p95_latency_ms`** — 95th-percentile latency in milliseconds across every
-  step (write + query), nearest-rank method. Captures tail latency, not just
+  successful step (write + query), nearest-rank method. Captures tail latency, not just
   the average.
 - **`semantic_recall`** *(judge)* — fraction of queries with a
   `judge.semantic_recall` rubric where the judge agrees the recalled context
@@ -118,6 +139,8 @@ pack (or the run config) didn't exercise that metric.
   `judge.contradiction` rubric where the judge finds the recalled context
   contains contradictory statements about the same fact (e.g. a stale value
   surfaced alongside its update). Lower is better. Requires the judge.
+- **`error_rate`** — fraction of steps (write + query) whose adapter call
+  failed or timed out. Above 10% the run is marked `"valid": false`.
 
 Deterministic metrics (`recall_precision`, `update_correctness`,
 `token_cost`, `p95_latency_ms`) always run offline. The two judge metrics
@@ -221,8 +244,9 @@ Things to note from that example, which apply to any new adapter:
 
 1. **Import-guard optional dependencies.** Wrap the vendor SDK import in
    `try/except ImportError` at module scope, and raise a clear, actionable
-   `ImportError` from `__init__` (not a bare traceback) telling the user
-   which extra to install.
+   `ImportError` from `__init__` telling the user which extra to install;
+   `membench run` prints it as a one-line error (exit code 1), not a
+   traceback.
 2. **No scoring logic inside the adapter.** Token counting uses the shared
    `core.tokens.count_tokens` helper; latency, precision, etc. are all
    computed by the runner/scoring modules from what `recall()` returns.
