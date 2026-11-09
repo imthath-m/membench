@@ -134,3 +134,12 @@ def test_mixed_eligible_queries_average():
     ]
 
     assert update_correctness(pack, traces) == 0.5
+
+
+def test_update_in_another_episode_not_eligible():
+    query = _query(["green"], "fact_color")
+    query.episode = 1
+    pack = Pack(name="p", description="", steps=[_write("fact_color", "update"), query])
+    traces = [_write_trace(0), _query_trace(1, "green")]
+
+    assert update_correctness(pack, traces) is None
