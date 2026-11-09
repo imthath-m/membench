@@ -3,7 +3,7 @@
 `resolve_pack(spec)` is what the CLI's `--pack` goes through. `spec` is a
 YAML path, a public dataset (`longmemeval-s`, `longmemeval-m`,
 `longmemeval-oracle`, `locomo`: downloaded at a pinned revision, sha256
-checked, cached; see `fetch.py`), a synthetic pack (`tool-call-memory`,
+checked, cached; see `download.py`), a synthetic pack (`tool-call-memory`,
 `document-chain`, `multi-step-decisions`, `customer-support-xl`,
 `coding-assistant-xl`: generated in memory from `--pack-seed`), or a bundled
 pack name. Every pack is built in memory; nothing is written to disk.
@@ -24,7 +24,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from membench.datasets import locomo, longmemeval
-from membench.datasets.fetch import DatasetError, Source, fetch
+from membench.datasets.download import DatasetError, Source, fetch
 from membench.generate.synthetic import GENERATOR_VERSION, generate
 from membench.packs.schema import Pack, QueryStep, builtin_pack_path, load_pack, parse_pack
 

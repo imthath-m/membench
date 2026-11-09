@@ -318,3 +318,21 @@ def test_build_judge_reads_key_from_env(tmp_path, monkeypatch):
     monkeypatch.setenv("MEMBENCH_JUDGE_API_KEY", "env-key")
     judge = build_judge(cache_path=tmp_path / "c.json")
     assert judge is not None and judge.client.api_key == "env-key"
+
+
+def test_cached_judge_ask_uses_the_given_prompt_and_parser(tmp_path):
+    from membench.core.scoring.judge import parse_yes_no
+
+    class Client:
+        model = "m"
+        calls = 0
+
+        def respond(self, prompt):
+            Client.calls += 1
+            return " Yes.", {"input_tokens": 3, "output_tokens": 1}
+
+    judge = CachedJudge(Client(), tmp_path / "cache.json")
+    assert judge.ask("Is it? Answer yes or no only.", parse_yes_no).passed
+    assert judge.ask("Is it? Answer yes or no only.", parse_yes_no).passed
+    assert Client.calls == 1
+    assert not parse_yes_no("No").passed

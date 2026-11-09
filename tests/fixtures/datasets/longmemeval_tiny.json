@@ -1,0 +1,49 @@
+[
+  {
+    "question_id": "tiny_1",
+    "question_type": "single-session-user",
+    "question": "What colour is my bike?",
+    "answer": "Green",
+    "question_date": "2024/03/10 (Sun) 09:00",
+    "haystack_dates": ["2024/03/05 (Tue) 18:30", "2024/03/01 (Fri) 12:00"],
+    "haystack_session_ids": ["answer_tiny_a", "noise_tiny_b"],
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I just painted my bike green.", "has_answer": true},
+        {"role": "assistant", "content": "Nice, green bikes stand out."}
+      ],
+      [
+        {"role": "user", "content": "Any tips for a rainy commute?"},
+        {"role": "assistant", "content": "Mudguards and a good jacket."}
+      ]
+    ],
+    "answer_session_ids": ["answer_tiny_a"]
+  },
+  {
+    "question_id": "tiny_2",
+    "question_type": "knowledge-update",
+    "question": "How many plants do I have now?",
+    "answer": 4,
+    "question_date": "2024/05/02 (Thu) 10:00",
+    "haystack_dates": ["2024/04/01 (Mon) 08:00", "2024/04/20 (Sat) 08:00"],
+    "haystack_session_ids": ["answer_tiny_c", "answer_tiny_d"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "I have three plants on my desk.", "has_answer": true}],
+      [{"role": "user", "content": "I bought one more plant, so four now.", "has_answer": true}]
+    ],
+    "answer_session_ids": ["answer_tiny_c", "answer_tiny_d"]
+  },
+  {
+    "question_id": "tiny_3_abs",
+    "question_type": "single-session-user",
+    "question": "What is my cat's name?",
+    "answer": "The information provided is not enough. You only mentioned a dog.",
+    "question_date": "2024/06/01 (Sat) 10:00",
+    "haystack_dates": ["2024/05/20 (Mon) 08:00"],
+    "haystack_session_ids": ["answer_tiny_e"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "My dog Rex loves the park.", "has_answer": true}]
+    ],
+    "answer_session_ids": ["answer_tiny_e"]
+  }
+]

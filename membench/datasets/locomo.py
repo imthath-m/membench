@@ -28,7 +28,7 @@ from typing import Any
 
 import yaml
 
-from membench.datasets.fetch import Source
+from membench.datasets.download import Source
 
 _REVISION = "3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376"
 SOURCE = Source(
