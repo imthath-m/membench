@@ -8,6 +8,14 @@ _REGISTRY: dict[str, str] = {
     "full-context": "membench.adapters.full_context.FullContextAdapter",
     "chroma": "membench.adapters.chroma.ChromaAdapter",
     "mem0": "membench.adapters.mem0.Mem0Adapter",
+    "mem0-platform": "membench.adapters.mem0_platform.Mem0PlatformAdapter",
+    "zep": "membench.adapters.zep.ZepAdapter",
+    "letta": "membench.adapters.letta.LettaAdapter",
+    "letta-agent": "membench.adapters.letta_agent.LettaAgentAdapter",
+    "langmem": "membench.adapters.langmem.LangMemAdapter",
+    "cognee": "membench.adapters.cognee.CogneeAdapter",
+    "bm25": "membench.adapters.bm25.BM25Adapter",
+    "oracle": "membench.adapters.oracle.OracleAdapter",
 }
 
 

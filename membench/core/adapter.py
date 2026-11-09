@@ -68,6 +68,9 @@ class MemoryAdapter(ABC):
     packages: tuple[str, ...] = ()  # backend SDK distributions whose versions the manifest records
     deployment: str = "local"  # "local" | "hosted"; a hosted region comes from config["region"]
     uses_llm: bool = False  # backend calls an LLM (non-deterministic): default --repeats 3
+    # Oracle baseline only: the runner sets `adapter.evidence` (the query's gold
+    # `evidence` event ids) before each recall. Every real backend leaves it False.
+    sees_evidence: bool = False
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config = config or {}
