@@ -50,23 +50,19 @@ _PACK_HELP = (
 )
 
 
-def _pack_options() -> dict:
-    """The `--pack` selection options shared by `run` and `convert`."""
-    return {
-        "pack_seed": typer.Option(0, "--pack-seed", help="Seed of a synthetic pack."),
-        "exclude_flagged": typer.Option(
-            False, "--exclude-flagged",
-            help="Drop queries on the dataset's exclusion list (e.g. LoCoMo).",
-        ),
-        "limit": typer.Option(None, "--limit", min=1, help="Keep only the first N queries."),
-        "sample": typer.Option(
-            None, "--sample", min=1,
-            help="Keep a random N queries, stratified by category (seeded by --seed).",
-        ),
-    }
-
-
-_OPT = _pack_options()
+# `--pack` selection options shared by `run` and `convert`.
+_OPT = {
+    "pack_seed": typer.Option(0, "--pack-seed", help="Seed of a synthetic pack."),
+    "exclude_flagged": typer.Option(
+        False, "--exclude-flagged",
+        help="Drop queries on the dataset's exclusion list (e.g. LoCoMo).",
+    ),
+    "limit": typer.Option(None, "--limit", min=1, help="Keep only the first N queries."),
+    "sample": typer.Option(
+        None, "--sample", min=1,
+        help="Keep a random N queries, stratified by category (seeded by --seed).",
+    ),
+}
 
 
 def _load_backend_config(path: Path | None) -> dict:
