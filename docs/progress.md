@@ -4,7 +4,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | Phase | Branch | PR | Status |
 |---|---|---|---|
 | 8 | claude/gracious-edison-v8eyxs | #6 | done (live run blocked) |
-| 9 | claude/gracious-edison-v8eyxs-phase-9 | — | in progress |
+| 9 | claude/gracious-edison-v8eyxs-phase-9 | — | done |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -27,18 +27,26 @@ Status: done (with blocked items)
   - Newer ruff (0.17) enables extra default rules (e.g. BLE001, UP035); CI installs the latest ruff, so lint with a current version.
 
 ## Phase 9 — Adapter contract v2 (breaking, bump to 0.2)
-Status: in progress
-- [ ] Split identity: `Event.id` (unique, opaque) is the only id adapters see; pack `fact_key` used only for scoring (fixes Chroma overwrite leak)
-- [ ] `recall(query, *, session_id, at)`
-- [ ] `flush()` (default no-op); runner calls it before a query that follows writes, records `ingest_latency_ms`
-- [ ] `RecallResult.items` → `list[RecalledItem(event_ids, text, score)]`; adapters map ids back to `Event.id`
-- [ ] Token counting in the runner (configured tokenizer); `RecallResult.token_count` removed
-- [ ] Optional `usage()` (cumulative backend LLM/embedding tokens)
-- [ ] `forget` step type (`target: <event id(s)>`); runner calls `adapter.forget`
-- [ ] Episodes: pack holds one or more `episodes`, `reset()` between them
-- [ ] Port all 3 adapters; README documents the contract; version 0.2.0
-- [ ] Test: every file in `membench/adapters/` < 100 lines
-- [ ] Test: update-resolution pack (distinct ids, no `fact_key` reaches adapters, Chroma context holds both values) on all 3 adapters
-- [ ] Test: Chroma `update_correctness` no longer 1.0 by construction (regression)
-- [ ] Test: runner `forget` step reaches `adapter.forget` with target ids, traced with latency
-- [ ] Test: pack with a `forget` step and two episodes runs on all 3 adapters
+Status: done
+- [x] Split identity: `Event.id` (unique, opaque) is the only id adapters see; pack `fact_key` used only for scoring (fixes Chroma overwrite leak)
+- [x] `recall(query, *, session_id, at)`
+- [x] `flush()` (default no-op); runner calls it before a query that follows writes, records `ingest_latency_ms`
+- [x] `RecallResult.items` → `list[RecalledItem(event_ids, text, score)]`; adapters map ids back to `Event.id`
+- [x] Token counting in the runner (configured tokenizer); `RecallResult.token_count` removed
+- [x] Optional `usage()` (cumulative backend LLM/embedding tokens)
+- [x] `forget` step type (`target: <event id(s)>`); runner calls `adapter.forget`
+- [x] Episodes: pack holds one or more `episodes`, `reset()` between them
+- [x] Port all 3 adapters; README documents the contract; version 0.2.0
+- [x] Test: every file in `membench/adapters/` < 100 lines
+- [x] Test: update-resolution pack (distinct ids, no `fact_key` reaches adapters, Chroma context holds both values) on all 3 adapters
+- [x] Test: Chroma `update_correctness` no longer 1.0 by construction (regression)
+- [x] Test: runner `forget` step reaches `adapter.forget` with target ids, traced with latency
+- [x] Test: pack with a `forget` step and two episodes runs on all 3 adapters
+- Mem0 is covered by the fake `mem0.Memory` client only (no `mem0ai` / `OPENAI_API_KEY` here); a live check is `gh workflow run live.yml -f pack=mini` once secrets exist (same block as Phase 8).
+- Notes for next phases:
+  - Pack YAML: write `key` → `fact_key` (old `key` gives a clear error); optional write `id` (auto `evt-<global step index>`); `forget` step with `target` (id or list, must be an earlier write in the same episode); `episodes: [{steps: [...]}]` or top-level `steps`. `Pack.steps` stays flat; each step and `StepTrace` carry `episode` (int).
+  - Contract: `recall(query, *, session_id, at)` (`at` = query step timestamp, ISO str); `forget(event_ids: list[str])` (one call per forget step); `flush()`, `reset()`, `usage()` optional.
+  - Runner: `reset()` between episodes (a failed reset errors every step of that episode); `flush()` before a query that follows a write or forget, timed into query `detail.ingest_latency_ms` (None when no flush ran); a flush error fails that query (`error` "flush: ...") and recall is skipped. `run_pack(tokenizer=count_tokens)` counts `context`; no CLI flag yet (Phase 11 adds the real tokenizer). `RunResult.usage` = `adapter.usage()` read once at the end (all 3 adapters return None; Mem0 extraction-token tracking left for Phase 10 cost accounting).
+  - Trace detail: write `{event_id, fact_key, fact_type, retries}`; forget `{target, retries}`; query adds `items` (list of `{event_ids, text, score}`) and drops `item_count`. Forget latency is pooled into `p95_latency_ms` and counted in `error_rate`.
+  - `update_correctness` scopes updates per episode. Chroma item score is `-distance`; Mem0 maps memory id → source Event.ids (an add may create/update several memories; forgetting an event deletes every memory derived from it).
+  - Chroma still scores 1.0 `update_correctness` on the bundled packs at `top_k=3` (both values are surfaced), now earned; the Phase 11 staleness metric is what penalises that.
