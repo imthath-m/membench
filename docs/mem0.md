@@ -60,3 +60,10 @@ OpenAI rate-limit, timeout and connection errors raised from Mem0's own
 LLM/embedder calls are retried by the runner with exponential backoff; each
 retry is logged. A step that still fails is recorded as an `error` in the
 trace and the run continues (see the README's "Failures during a run").
+
+Cost and reproducibility: the adapter counts Mem0's own OpenAI calls (fact
+extraction LLM and embeddings) from each response's `usage`, and reports the
+LLM model, base URL, temperature and embedding model it runs with. Both land
+in the report (`usage`, `manifest.backend.models`, `cost.backend`), priced
+against `membench/prices.yaml`. Calls through a non-OpenAI provider are not
+counted (usage stays 0). Mem0's LLM extraction is not deterministic.
