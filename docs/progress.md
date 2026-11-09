@@ -184,7 +184,7 @@ Status: done (with blocked items)
 
 ## Phase 15 — Judge validation
 Status: in progress
-- [ ] Synthetic packs carry judge rubrics (semantic_recall on answerable queries, contradiction on update queries) so every judge metric has ≥200 candidate items
+- [x] Synthetic packs carry judge rubrics (semantic_recall on answerable queries, contradiction on update queries) so every judge metric has ≥200 candidate items
 - [ ] `membench judge-sample`: stratified by metric, backend, verdict, context-length bucket; ≥200 items per judge metric
 - [ ] Labelling guidelines (2 independent annotators + adjudication)
 - [ ] `validation/labels.jsonl` format + loader/validator; merge of 2 annotators + adjudication
