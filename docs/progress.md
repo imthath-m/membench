@@ -265,8 +265,8 @@ Status: in progress
 - [x] Re-score committed `results/` + re-derive `results/README.md`; update `docs/comparison.md` numbers
 - [x] Remove the bug from known-issue lists
 - [x] `docs/HANDOFF.md` (state, PR stack, keys & setup table, open-items runbook, caveats, agent conventions)
-- [ ] Root `CLAUDE.md` + README pointer; "Overall status" consistent with HANDOFF; no stale statements
-- [ ] Checks: pytest, ruff, `uv lock --check`, results rescore + leaderboard diff
+- [x] Root `CLAUDE.md` + README pointer; "Overall status" consistent with HANDOFF; no stale statements
+- [x] Checks: pytest, ruff, `uv lock --check`, results rescore + leaderboard diff
 - [ ] PR opened; number recorded here and in HANDOFF
 - Notes:
   - Matching decision: `expect_absent` checks (`contains_any`: staleness, forget compliance) match whole words/phrases: case-insensitive, needle regex-escaped, `(?<!\w)needle(?!\w)` so punctuation-edged needles (`$49.99`, `C++`) still match. `expect_contains` checks (recall precision, update correctness, temporal accuracy) stay plain substrings: both choices err toward not penalising a backend (a stale value inside another word is no leak; an inflection like "tickets" still counts as a hit). Switching `expect_contains` too would change no committed result (checked), so it is a policy choice, not a data one. `report --failures` excerpts still centre on the first substring hit (display only).

@@ -9,11 +9,16 @@ rate, QA accuracy (optional reader stage), token cost and per-stage latency,
 overall and per query category.
 
 Everything runs offline except the optional LLM judge (provider-agnostic;
-Claude by default).
+Claude by default), the optional reader stage, and the LLM-backed or hosted
+backends (Mem0, Zep, Letta, LangMem, Cognee).
+
+Contributors and agents: start at [docs/HANDOFF.md](docs/HANDOFF.md).
 
 ## Install
 
-Not published to PyPI yet (v0.2.0 is prepared: `release.yml`); install from GitHub:
+Not published to PyPI yet (v0.2.0 is prepared: `release.yml`); install from GitHub
+(`main` holds v0.1 until the v0.2 PR stack is merged; see
+[docs/HANDOFF.md](docs/HANDOFF.md)):
 
 ```bash
 pip install "membench @ git+https://github.com/imthath-m/membench"
@@ -670,7 +675,9 @@ After changing dependencies in `pyproject.toml`, run `uv lock` (CI checks
 `REPORT_SCHEMA_VERSION` (`membench/core/manifest.py`), update
 `membench/report.schema.json`, and regenerate the committed fixture with
 `python tests/fixtures/make_report.py`. After changing the judge prompt or
-verdict parsing, bump `JUDGE_PROMPT_VERSION`.
+verdict parsing, bump `JUDGE_PROMPT_VERSION`. After changing a metric,
+re-score and re-publish the committed `results/` (`membench rescore --out`,
+then `membench publish`) and re-run `membench leaderboard` (CI checks both).
 
 More docs: per-backend pages (see "Backends"), [docs/vendor-review.md](docs/vendor-review.md),
 [docs/generate.md](docs/generate.md) (transcript-to-pack generator).
