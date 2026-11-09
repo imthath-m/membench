@@ -5,6 +5,7 @@ import membench.core.scoring.judge as judge_module
 from membench.core.scoring.judge import (
     AnthropicClient,
     CachedJudge,
+    CacheMissError,
     JudgeCache,
     JudgeError,
     OpenAICompatibleClient,
@@ -181,6 +182,58 @@ def test_cache_key_includes_model():
     assert JudgeCache.key("model-a", prompt) != JudgeCache.key("model-b", prompt)
 
 
+def test_cache_key_includes_prompt_version(monkeypatch):
+    prompt = build_prompt("r", "e")
+    v1 = JudgeCache.key("m", prompt)
+    monkeypatch.setattr(judge_module, "JUDGE_PROMPT_VERSION", "2")
+    assert JudgeCache.key("m", prompt) != v1
+
+
+def test_cache_stores_raw_reply_and_usage(tmp_path):
+    body = _anthropic_body('{"verdict": "pass", "reason": "ok"}')
+    body["usage"] = {"input_tokens": 120, "output_tokens": 9}
+    judge = _cached(tmp_path, FakeHTTP(body))
+
+    judge.score("r", "e")
+    judge.score("r", "e")  # cache hit: no new tokens
+
+    (entry,) = JudgeCache(tmp_path / "cache.json")._data.values()
+    assert entry == {
+        "passed": True, "reason": "ok", "raw": '{"verdict": "pass", "reason": "ok"}',
+        "usage": {"input_tokens": 120, "output_tokens": 9},
+    }
+    assert judge.usage == {"calls": 1, "cache_hits": 1, "input_tokens": 120, "output_tokens": 9}
+
+
+def test_openai_usage_is_normalised(tmp_path):
+    body = _openai_body('{"verdict": "pass"}')
+    body["usage"] = {"prompt_tokens": 50, "completion_tokens": 4}
+    judge = _cached(tmp_path, FakeHTTP(body), openai=True)
+
+    judge.score("r", "e")
+
+    assert judge.usage["input_tokens"] == 50 and judge.usage["output_tokens"] == 4
+
+
+# --- strict cache -----------------------------------------------------------
+
+def test_strict_cache_hit_needs_no_client(tmp_path):
+    _cached(tmp_path, FakeHTTP(_anthropic_body('{"verdict": "pass"}'))).score("r", "e")
+
+    strict = build_judge(model=judge_module.DEFAULT_JUDGE_MODEL, cache_path=tmp_path / "cache.json",
+                         strict=True)
+
+    assert strict.client is None
+    assert strict.score("r", "e").passed is True
+
+
+def test_strict_cache_miss_is_an_error(tmp_path):
+    strict = build_judge(cache_path=tmp_path / "cache.json", strict=True)
+
+    with pytest.raises(CacheMissError):
+        strict.score("r", "e")
+
+
 # --- malformed replies / unexpected shapes -> JudgeError --------------------
 
 def _cached(tmp_path, http, openai=False):
@@ -204,14 +257,24 @@ def test_unparseable_reply_is_retried_once_then_succeeds(tmp_path):
 
 
 @pytest.mark.parametrize("reply", ["no json here", '{"verdict": pass, }'])
-def test_unparseable_reply_twice_raises_judge_error_and_is_not_cached(tmp_path, reply):
+def test_unparseable_reply_twice_raises_judge_error_cached_but_retried(tmp_path, reply):
     http = FakeHTTP(_anthropic_body(reply))
     judge = _cached(tmp_path, http)
 
     with pytest.raises(JudgeError, match="failed to parse twice"):
         judge.score("r", "e")
     assert len(http.calls) == 2
-    assert not (tmp_path / "cache.json").exists()
+    (entry,) = JudgeCache(tmp_path / "cache.json")._data.values()
+    assert "failed to parse twice" in entry["error"] and entry["raw"] == reply
+
+    # A non-strict re-run asks the client again; a strict replay reproduces the error.
+    with pytest.raises(JudgeError):
+        _cached(tmp_path, http).score("r", "e")
+    assert len(http.calls) == 4
+    strict = CachedJudge(None, tmp_path / "cache.json", strict=True, model=judge.model)
+    with pytest.raises(JudgeError, match="failed to parse twice"):
+        strict.score("r", "e")
+    assert len(http.calls) == 4
 
 
 @pytest.mark.parametrize(

@@ -13,9 +13,10 @@ Two thin HTTP clients are provided:
 
 Both talk their HTTP APIs directly via httpx rather than pulling in a vendor
 SDK — the judge makes one structured call, so a heavyweight dependency isn't
-warranted. Every call is cached on disk keyed by (judge model, prompt hash),
-so scores from different judges are never silently compared and CI replays
-without touching the network.
+warranted. Every call is cached on disk keyed by (judge model, prompt version,
+prompt hash), with its raw reply and token `usage`, so scores from different
+judges or prompts are never silently compared and CI replays without touching
+the network (`strict` mode turns a cache miss into an error).
 """
 
 from __future__ import annotations
@@ -31,6 +32,9 @@ from typing import Any, Protocol, runtime_checkable
 import httpx
 
 DEFAULT_JUDGE_MODEL = "claude-sonnet-5"
+# Bump whenever `build_prompt` or `parse_verdict` changes: it is part of the
+# cache key and the run manifest, so verdicts from different prompts never mix.
+JUDGE_PROMPT_VERSION = "1"
 DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 API_KEY_ENV = "MEMBENCH_JUDGE_API_KEY"
 _ANTHROPIC_VERSION = "2023-06-01"
@@ -57,6 +61,10 @@ class Judge(Protocol):
 
 class JudgeError(Exception):
     """A judge call gave no usable verdict; the query is recorded, not scored."""
+
+
+class CacheMissError(Exception):
+    """Strict cache: a verdict the run needs is not in the judge cache."""
 
 
 def record_judge_error(detail: dict[str, Any], metric: str, exc: JudgeError) -> None:
@@ -119,8 +127,8 @@ class AnthropicClient:
         self.base_url = (base_url or DEFAULT_ANTHROPIC_BASE_URL).rstrip("/")
         self._http = http_client or httpx.Client(timeout=60)
 
-    def complete(self, prompt: str, max_tokens: int = 4096) -> str:
-        """Raw text completion — shared by `score()` and the pack generator."""
+    def respond(self, prompt: str, max_tokens: int = 256) -> tuple[str, dict[str, int]]:
+        """One completion: (reply text, `usage` as input/output tokens)."""
         resp = _post_with_retry(
             self._http,
             f"{self.base_url}/v1/messages",
@@ -136,11 +144,20 @@ class AnthropicClient:
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
-        return resp.json()["content"][0]["text"]
+        body = resp.json()
+        text = body["content"][0]["text"]
+        usage = body.get("usage") or {}
+        return text, {
+            "input_tokens": usage.get("input_tokens", 0),
+            "output_tokens": usage.get("output_tokens", 0),
+        }
+
+    def complete(self, prompt: str, max_tokens: int = 4096) -> str:
+        """Raw text completion — used by the pack generator."""
+        return self.respond(prompt, max_tokens=max_tokens)[0]
 
     def score(self, rubric: str, evidence: str) -> Verdict:
-        text = self.complete(build_prompt(rubric, evidence), max_tokens=256)
-        return parse_verdict(text)
+        return parse_verdict(self.respond(build_prompt(rubric, evidence))[0])
 
 
 class OpenAICompatibleClient:
@@ -158,8 +175,8 @@ class OpenAICompatibleClient:
         self.base_url = base_url.rstrip("/")
         self._http = http_client or httpx.Client(timeout=60)
 
-    def complete(self, prompt: str) -> str:
-        """Raw text completion — shared by `score()` and the pack generator."""
+    def respond(self, prompt: str) -> tuple[str, dict[str, int]]:
+        """One completion: (reply text, `usage` as input/output tokens)."""
         resp = _post_with_retry(
             self._http,
             f"{self.base_url}/chat/completions",
@@ -173,14 +190,28 @@ class OpenAICompatibleClient:
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
-        return resp.json()["choices"][0]["message"]["content"]
+        body = resp.json()
+        text = body["choices"][0]["message"]["content"]
+        usage = body.get("usage") or {}
+        return text, {
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+        }
+
+    def complete(self, prompt: str) -> str:
+        """Raw text completion — used by the pack generator."""
+        return self.respond(prompt)[0]
 
     def score(self, rubric: str, evidence: str) -> Verdict:
-        return parse_verdict(self.complete(build_prompt(rubric, evidence)))
+        return parse_verdict(self.respond(build_prompt(rubric, evidence))[0])
 
 
 class JudgeCache:
-    """On-disk JSON cache of verdicts keyed by (judge model, prompt hash)."""
+    """On-disk JSON cache keyed by (judge model, prompt version, prompt hash).
+
+    An entry holds the verdict (`passed`, `reason`) or the `error` it failed
+    with, plus the `raw` reply text and the call's token `usage`.
+    """
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -190,15 +221,14 @@ class JudgeCache:
 
     @staticmethod
     def key(model: str, prompt: str) -> str:
-        digest = hashlib.sha256(f"{model}\n{prompt}".encode()).hexdigest()
-        return f"{model}:{digest}"
+        digest = hashlib.sha256(f"{model}\n{JUDGE_PROMPT_VERSION}\n{prompt}".encode()).hexdigest()
+        return f"{model}:v{JUDGE_PROMPT_VERSION}:{digest}"
 
-    def get(self, key: str) -> Verdict | None:
-        entry = self._data.get(key)
-        return Verdict(**entry) if entry is not None else None
+    def get(self, key: str) -> dict | None:
+        return self._data.get(key)
 
-    def set(self, key: str, verdict: Verdict) -> None:
-        self._data[key] = {"passed": verdict.passed, "reason": verdict.reason}
+    def set(self, key: str, entry: dict) -> None:
+        self._data[key] = entry
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self._data, indent=2, sort_keys=True))
 
@@ -208,35 +238,64 @@ class CachedJudge:
 
     A reply that fails to parse (`ValueError`) is retried once; an unexpected
     response shape (`KeyError`, `IndexError`, `TypeError`) is not. Either
-    failure raises `JudgeError` and is never cached.
+    failure raises `JudgeError`; it is cached (with the raw reply) so a strict
+    replay reproduces it, but a non-strict run calls the client again.
+
+    `strict=True` never calls the client (it may be None): a cache miss raises
+    `CacheMissError`. `usage` totals this run's client calls, tokens and hits.
     """
 
-    def __init__(self, client: Judge, cache_path: str | Path) -> None:
+    def __init__(
+        self,
+        client: Any | None,
+        cache_path: str | Path,
+        *,
+        strict: bool = False,
+        model: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
         self.client = client
-        self.model = client.model
+        self.model = model or client.model
+        self.base_url = base_url or getattr(client, "base_url", None)
+        self.strict = strict
         self.cache = JudgeCache(cache_path)
+        self.usage = {"calls": 0, "cache_hits": 0, "input_tokens": 0, "output_tokens": 0}
 
     def score(self, rubric: str, evidence: str) -> Verdict:
         prompt = build_prompt(rubric, evidence)
         key = JudgeCache.key(self.model, prompt)
-        cached = self.cache.get(key)
-        if cached is not None:
-            return cached
-        verdict = self._score_uncached(rubric, evidence)
-        self.cache.set(key, verdict)
-        return verdict
+        entry = self.cache.get(key)
+        if entry is not None and (self.strict or "error" not in entry):
+            self.usage["cache_hits"] += 1
+        elif self.strict or self.client is None:
+            raise CacheMissError(f"no cached verdict for {key} (strict judge cache)")
+        else:
+            entry = self._call(prompt)
+            self.cache.set(key, entry)
+        if "error" in entry:
+            raise JudgeError(entry["error"])
+        return Verdict(passed=entry["passed"], reason=entry["reason"])
 
-    def _score_uncached(self, rubric: str, evidence: str) -> Verdict:
+    def _call(self, prompt: str) -> dict:
+        """Ask the client (one parse retry); return a cache entry."""
+        usage, raw = {"input_tokens": 0, "output_tokens": 0}, None
         for attempt in range(2):
+            self.usage["calls"] += 1
             try:
-                return self.client.score(rubric, evidence)
+                raw, call_usage = self.client.respond(prompt)
+                for name in usage:
+                    usage[name] += call_usage.get(name, 0)
+                    self.usage[name] += call_usage.get(name, 0)
+                verdict = parse_verdict(raw)
+                return {"passed": verdict.passed, "reason": verdict.reason, "raw": raw,
+                        "usage": usage}
             except (KeyError, IndexError, TypeError) as exc:
-                raise JudgeError(
-                    f"unexpected judge response shape: {type(exc).__name__}: {exc}"
-                ) from exc
+                error = f"unexpected judge response shape: {type(exc).__name__}: {exc}"
+                return {"error": error, "raw": raw, "usage": usage}
             except ValueError as exc:
                 if attempt == 1:
-                    raise JudgeError(f"judge reply failed to parse twice: {exc}") from exc
+                    error = f"judge reply failed to parse twice: {exc}"
+                    return {"error": error, "raw": raw, "usage": usage}
         raise AssertionError("unreachable")  # pragma: no cover
 
 
@@ -268,11 +327,18 @@ def build_judge(
     base_url: str | None = None,
     api_key: str | None = None,
     cache_path: str | Path,
+    strict: bool = False,
 ) -> CachedJudge | None:
     """Construct a cached judge, or return None when no API key is available.
 
     A missing key is not an error — the caller reports judge metrics as null.
+    `strict` builds a cache-only judge (no client, no key needed).
     """
+    if strict:
+        return CachedJudge(
+            None, cache_path, strict=True, model=model or DEFAULT_JUDGE_MODEL,
+            base_url=base_url,
+        )
     client = resolve_client(model=model, base_url=base_url, api_key=api_key)
     if client is None:
         return None

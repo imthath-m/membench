@@ -1,3 +1,5 @@
+import json
+
 from membench.adapters.full_context import FullContextAdapter
 from membench.core.runner import StepTrace, run_pack
 from membench.core.scoring.contradiction_rate import contradiction_rate
@@ -26,9 +28,12 @@ class CountingClient:
     def __init__(self):
         self.calls = 0
 
-    def score(self, rubric, evidence):
+    def respond(self, prompt):
         self.calls += 1
-        return Verdict(passed="green" in evidence.lower(), reason="stub")
+        verdict = "pass" if "green" in prompt.split("EVIDENCE:")[-1].lower() else "fail"
+        return json.dumps({"verdict": verdict, "reason": "stub"}), {
+            "input_tokens": 10, "output_tokens": 2,
+        }
 
 
 def _query(judge_spec):
