@@ -9,7 +9,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 11 | claude/gracious-edison-v8eyxs-phase-11 | #9 | done (live reader run blocked) |
 | 12 | claude/gracious-edison-v8eyxs-phase-12 | #10 | done (oracle ±3pp + LoCoMo human audit blocked) |
 | 13 | claude/gracious-edison-v8eyxs-phase-13 | #11 | done (LLM-backed repeats blocked) |
-| 14 | claude/gracious-edison-v8eyxs-phase-14 | — | done (live vendor runs blocked) |
+| 14 | claude/gracious-edison-v8eyxs-phase-14 | #12 | done (live vendor runs blocked) |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
