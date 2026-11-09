@@ -9,6 +9,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 11 | claude/gracious-edison-v8eyxs-phase-11 | #9 | done (live reader run blocked) |
 | 12 | claude/gracious-edison-v8eyxs-phase-12 | #10 | done (oracle ±3pp + LoCoMo human audit blocked) |
 | 13 | claude/gracious-edison-v8eyxs-phase-13 | #11 | done (LLM-backed repeats blocked) |
+| 14 | claude/gracious-edison-v8eyxs-phase-14 | — | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -150,3 +151,20 @@ Status: done (with blocked items)
   - `rescore` re-scores the report and every repeat, recomputes `repeat_summary`, and `--check` also diffs `outcomes` / `stats` when the report has them (pre-Phase-13 reports are checked on scores + by_category only).
   - `membench compare --a --b [--out x.md|x.json]` (`core/report/compare.py`): pairs top-level (repeat 0) outcomes by step index, overall + per category (`CATEGORY_METRICS`); `stats.paired_diff` (paired bootstrap CI, McNemar exact for bool, bootstrap p otherwise); Holm over all rows; `significant` = Holm p < 0.05 and CI excludes 0. Refuses different pack sha (incl. subset), judge or reader model/prompt version, or reports without `outcomes` (fix: `membench rescore --in old.json --out new.json`).
   - `membench report --in a --in b` (side by side) cells now read "72% [65–78%] n=40 (indicative)" when stats exist.
+
+## Phase 14 — Backend coverage
+Status: in progress
+- [ ] Shared adapter contract test suite (write → flush → recall finds it; forget removes it; reset empties; episode isolation)
+- [ ] `bm25` baseline (lexical floor, offline)
+- [ ] `oracle` baseline (only the query's `evidence` events; reader upper bound)
+- [ ] Mem0 Platform (`MemoryClient`; `flush()` polls async ingestion; namespace per episode)
+- [ ] Zep Cloud (user graph; graph search; `flush()` waits for ingestion; `at` via bi-temporal facts)
+- [ ] Letta archival passages + core blocks; separate `letta-agent` (agent-managed memory via messages)
+- [ ] LangMem (memory-store manager over a LangGraph `BaseStore`; recall `store.search`)
+- [ ] Cognee (`add` / `flush()` → `cognify` / `search` / `reset()` prunes; async wrapped)
+- [ ] Per backend: optional extra, import guard, `docs/<backend>.md`, mocked unit tests, gated live test
+- [ ] `live.yml`: matrix over the hosted backends (secret-gated, manual dispatch)
+- [ ] Vendor review: draft issue text + default / vendor-tuned config slots (`docs/vendor-review.md`)
+- [ ] README + registry + `uv.lock`
+- [ ] Done-when: all 5 run `mini` live via `live.yml`
+
