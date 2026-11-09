@@ -1,0 +1,38 @@
+{
+  "claude-sonnet-5:v1:442ef8c147e5514c2a0e9c24ba35054b6892128e2c3ae4077947fff502f3847d": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 123,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:61b94d0a9a86ac5a15e9d061c9b227fd516cffd4866020e2655653b0ac0fdcfc": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 147,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:6945bbbc7b96077ffe57ba5df070f29e52ec04f77c8a9312b1e823d85165aed3": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 116,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:bd0a4effd22dccc55800025528494f0651f3dc5b84fa3fb6d5c94e29af2b8347": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 154,
+      "output_tokens": 12
+    }
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/imthath-m/membench/blob/main/membench/report.schema.json",
+  "title": "membench run report",
+  "description": "JSON report written by `membench run` (manifest.schema_version 1).",
+  "type": "object",
+  "required": [
+    "pack_name", "backend_name", "started_at", "finished_at", "traces", "scores",
+    "usage", "valid", "manifest", "cost"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "pack_name": {"type": "string"},
+    "backend_name": {"type": "string"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "traces": {"type": "array", "items": {"$ref": "#/$defs/trace"}},
+    "scores": {
+      "type": "object",
+      "required": [
+        "recall_precision", "update_correctness", "token_cost", "p95_latency_ms",
+        "semantic_recall", "contradiction_rate", "error_rate"
+      ],
+      "additionalProperties": {"$ref": "#/$defs/maybe_number"}
+    },
+    "usage": {"$ref": "#/$defs/token_counts_or_null"},
+    "valid": {"type": "boolean"},
+    "manifest": {"$ref": "#/$defs/manifest"},
+    "cost": {"$ref": "#/$defs/cost"}
+  },
+  "$defs": {
+    "maybe_number": {"type": ["number", "null"]},
+    "maybe_string": {"type": ["string", "null"]},
+    "token_counts_or_null": {
+      "type": ["object", "null"],
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "trace": {
+      "type": "object",
+      "required": [
+        "step_index", "step_type", "session_id", "latency_ms", "detail", "error", "episode"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "step_index": {"type": "integer", "minimum": 0},
+        "step_type": {"enum": ["write", "query", "forget"]},
+        "session_id": {"type": "string"},
+        "latency_ms": {"type": "number", "minimum": 0},
+        "detail": {"type": "object", "required": ["retries"]},
+        "error": {"$ref": "#/$defs/maybe_string"},
+        "episode": {"type": "integer", "minimum": 0}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"step_type": {"const": "write"}}},
+          "then": {"properties": {"detail": {"required": ["event_id", "fact_key", "fact_type"]}}}
+        },
+        {
+          "if": {"properties": {"step_type": {"const": "forget"}}},
+          "then": {"properties": {"detail": {
+            "required": ["target"],
+            "properties": {"target": {"type": "array", "items": {"type": "string"}}}
+          }}}
+        },
+        {
+          "if": {"properties": {"step_type": {"const": "query"}}},
+          "then": {"properties": {"detail": {
+            "required": [
+              "query", "context", "token_count", "items", "ingest_latency_ms",
+              "expect_contains", "expect_key"
+            ],
+            "properties": {
+              "context": {"type": "string"},
+              "token_count": {"type": "integer", "minimum": 0},
+              "ingest_latency_ms": {"$ref": "#/$defs/maybe_number"},
+              "items": {"type": "array", "items": {
+                "type": "object",
+                "required": ["event_ids", "text", "score"],
+                "properties": {
+                  "event_ids": {"type": "array", "items": {"type": "string"}},
+                  "text": {"type": "string"},
+                  "score": {"$ref": "#/$defs/maybe_number"}
+                }
+              }},
+              "judge_error": {"type": "object", "additionalProperties": {"type": "string"}}
+            }
+          }}}
+        }
+      ]
+    },
+    "manifest": {
+      "type": "object",
+      "required": [
+        "schema_version", "membench", "python", "os", "packages", "backend", "pack",
+        "dataset", "judge", "reader", "tokenizer", "seed", "repeat", "started_at",
+        "finished_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"const": "1"},
+        "membench": {
+          "type": "object",
+          "required": ["version", "git_commit", "git_dirty"],
+          "properties": {
+            "version": {"type": "string"},
+            "git_commit": {"$ref": "#/$defs/maybe_string"},
+            "git_dirty": {"type": ["boolean", "null"]}
+          }
+        },
+        "python": {"type": "string"},
+        "os": {"type": "string"},
+        "packages": {"type": "object", "additionalProperties": {"$ref": "#/$defs/maybe_string"}},
+        "backend": {
+          "type": "object",
+          "required": ["name", "config", "models", "deployment", "region"],
+          "properties": {
+            "name": {"type": "string"},
+            "config": {"type": "object"},
+            "models": {"type": ["object", "null"]},
+            "deployment": {"enum": ["local", "hosted"]},
+            "region": {"$ref": "#/$defs/maybe_string"}
+          }
+        },
+        "pack": {
+          "type": "object",
+          "required": ["name", "sha256"],
+          "properties": {
+            "name": {"type": "string"},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        "dataset": {
+          "type": ["object", "null"],
+          "required": ["id", "revision", "sha256"],
+          "properties": {
+            "id": {"type": "string"},
+            "revision": {"type": "string"},
+            "sha256": {"type": "string"}
+          }
+        },
+        "judge": {"$ref": "#/$defs/llm_or_null"},
+        "reader": {"$ref": "#/$defs/llm_or_null"},
+        "tokenizer": {"type": "string"},
+        "seed": {"type": "integer"},
+        "repeat": {"type": "integer", "minimum": 0},
+        "started_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "llm_or_null": {
+      "type": ["object", "null"],
+      "required": ["model", "base_url"],
+      "properties": {
+        "model": {"type": "string"},
+        "base_url": {"$ref": "#/$defs/maybe_string"},
+        "prompt_version": {"type": "string"}
+      }
+    },
+    "cost_part": {
+      "type": ["object", "null"],
+      "required": ["usd"],
+      "properties": {"usd": {"$ref": "#/$defs/maybe_number"}},
+      "additionalProperties": {"type": ["string", "integer", "number", "null"]}
+    },
+    "cost": {
+      "type": "object",
+      "required": [
+        "price_table_as_of", "judge", "reader", "backend", "total_usd", "usd_per_1k_queries"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "price_table_as_of": {"type": "string"},
+        "judge": {"$ref": "#/$defs/cost_part"},
+        "reader": {"$ref": "#/$defs/cost_part"},
+        "backend": {"$ref": "#/$defs/cost_part"},
+        "total_usd": {"$ref": "#/$defs/maybe_number"},
+        "usd_per_1k_queries": {"$ref": "#/$defs/maybe_number"}
+      }
+    }
+  }
+}

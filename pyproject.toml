@@ -37,7 +37,7 @@ Issues = "https://github.com/imthath-m/membench/issues"
 [project.optional-dependencies]
 chroma = ["chromadb>=0.5"]
 mem0 = ["mem0ai>=2.0"]
-dev = ["pytest>=8.0", "ruff>=0.6", "build>=1.0"]
+dev = ["pytest>=8.0", "ruff>=0.6", "build>=1.0", "jsonschema>=4.18"]
 
 [project.scripts]
 membench = "membench.cli:app"

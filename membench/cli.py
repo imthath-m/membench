@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import typer
@@ -12,10 +13,18 @@ from membench.core.registry import get_adapter_class, list_backends
 from membench.core.report.html import render_html
 from membench.core.report.json import write_json
 from membench.core.report.markdown import render_markdown
-from membench.core.runner import DEFAULT_STEP_TIMEOUT_S, MAX_ERROR_RATE, run_pack
+from membench.core.runner import (
+    DEFAULT_STEP_TIMEOUT_S,
+    MAX_ERROR_RATE,
+    StepTrace,
+    run_pack,
+)
+from membench.core.scoring import score_run
 from membench.core.scoring.judge import (
     API_KEY_ENV,
     DEFAULT_JUDGE_MODEL,
+    JUDGE_PROMPT_VERSION,
+    CacheMissError,
     build_judge,
     resolve_client,
 )
@@ -93,6 +102,16 @@ def run(
         help="Seconds each adapter call may take (retries included) before it is recorded "
         "as an error.",
     ),
+    strict_cache: bool = typer.Option(
+        False,
+        "--strict-cache",
+        help="Judge from the cache only (no API key needed); a cache miss is an error. "
+        "Use to replay published results.",
+    ),
+    seed: int = typer.Option(0, "--seed", help="Seed for every seedable RNG (recorded)."),
+    repeat_index: int = typer.Option(
+        0, "--repeat-index", help="Index of this run among repeats of the same config (recorded)."
+    ),
 ) -> None:
     """Replay a scenario pack against a backend adapter and write a JSON report."""
     try:
@@ -109,7 +128,8 @@ def run(
     judge_obj = None
     if judge:
         judge_obj = build_judge(
-            model=judge_model, base_url=judge_base_url, cache_path=judge_cache
+            model=judge_model, base_url=judge_base_url, cache_path=judge_cache,
+            strict=strict_cache,
         )
         if judge_obj is None:
             typer.echo(
@@ -126,9 +146,14 @@ def run(
         typer.echo(f"Error: could not set up backend {backend!r}: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    result = run_pack(
-        loaded_pack, adapter, backend_name=backend, judge=judge_obj, step_timeout=step_timeout
-    )
+    try:
+        result = run_pack(
+            loaded_pack, adapter, backend_name=backend, judge=judge_obj,
+            step_timeout=step_timeout, seed=seed, repeat=repeat_index,
+        )
+    except CacheMissError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
     write_json(result, out)
     typer.echo(f"Wrote report for pack={loaded_pack.name!r} backend={backend!r} to {out}")
     if not result.valid:
@@ -213,6 +238,76 @@ def report(
 
     out.write_text(renderer(reports))
     typer.echo(f"Wrote {format} report from {len(reports)} run(s) to {out}")
+
+
+@app.command()
+def rescore(
+    in_path: Path = typer.Option(..., "--in", help="JSON report to re-score."),
+    pack: str = typer.Option(
+        None, "--pack", help="Pack name or YAML path (default: the manifest's pack name)."
+    ),
+    judge_cache: Path = typer.Option(
+        Path(".membench_judge_cache.json"), "--judge-cache", help="Judge cache to replay."
+    ),
+    out: Path = typer.Option(None, "--out", help="Write the re-scored report here."),
+    check: bool = typer.Option(
+        False, "--check", help="Exit 1 if the re-scored scores differ from the report's."
+    ),
+) -> None:
+    """Recompute scores from a report's traces and the judge cache (no adapter, no network)."""
+    try:
+        report_data = json.loads(in_path.read_text())
+        manifest = report_data.get("manifest") or {}
+        if "pack" not in manifest:
+            raise ValueError(f"{in_path} has no run manifest (made before membench 0.2.x)")
+        loaded_pack = load_pack(_resolve_pack_path(pack or manifest["pack"]["name"]))
+        if loaded_pack.sha256 != manifest["pack"]["sha256"]:
+            raise ValueError(
+                f"pack {loaded_pack.name!r} content (sha256 {loaded_pack.sha256[:12]}…) differs "
+                f"from the run's ({manifest['pack']['sha256'][:12]}…)"
+            )
+        judge_info = manifest.get("judge")
+        judge_obj = None
+        if judge_info is not None:
+            if judge_info["prompt_version"] != JUDGE_PROMPT_VERSION:
+                raise ValueError(
+                    f"run used judge prompt v{judge_info['prompt_version']}, this membench has "
+                    f"v{JUDGE_PROMPT_VERSION}; re-run the judge instead"
+                )
+            judge_obj = build_judge(
+                model=judge_info["model"], base_url=judge_info["base_url"],
+                cache_path=judge_cache, strict=True,
+            )
+        traces = [StepTrace(**t) for t in report_data["traces"]]
+        scores = score_run(loaded_pack, traces, judge_obj)
+    except (
+        PackValidationError, ValueError, TypeError, KeyError, OSError, CacheMissError,
+        yaml.YAMLError,
+    ) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    diffs = {
+        name: (report_data["scores"].get(name), value)
+        for name, value in scores.items()
+        if report_data["scores"].get(name) != value
+    }
+    if out is not None:
+        error_rate = scores["error_rate"]
+        report_data.update(
+            traces=[asdict(t) for t in traces],
+            scores=scores,
+            valid=error_rate is None or error_rate <= MAX_ERROR_RATE,
+        )
+        out.write_text(json.dumps(report_data, indent=2))
+        typer.echo(f"Wrote re-scored report to {out}")
+    if not diffs:
+        typer.echo("Re-scored: identical to the report's scores.")
+        return
+    for name, (old, new) in diffs.items():
+        typer.echo(f"Re-scored: {name} {old} -> {new}", err=True)
+    if check:
+        raise typer.Exit(code=1)
 
 
 def _builtin_pack_names() -> list[str]:
