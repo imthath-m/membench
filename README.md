@@ -33,8 +33,9 @@ just replays the whole event log every query):
 membench run --backend full-context --pack customer-support --out report.json
 ```
 
-`--pack` takes a builtin pack name (see `membench list`) or a path to your
-own pack YAML. Run without the LLM judge (fully offline, no API key):
+`--pack` takes a builtin pack name, a public dataset or a synthetic pack
+(see `membench list` and [Datasets](#datasets-and-synthetic-packs)), or a
+path to your own pack YAML. Run without the LLM judge (fully offline, no API key):
 
 ```bash
 membench run --backend full-context --pack customer-support --no-judge --out report.json
@@ -137,7 +138,8 @@ independent scenarios with a `reset()` between them. Step types:
   answer: "Blue"             # gold answer the reader's reply is judged against
   expect_absent: ["green"]   # stale / forgotten strings the context must not contain
   evidence: [color-1]        # ids of the earlier writes that answer it
-  # abstain: true            # no answer exists (no `answer`); the reader should say it doesn't know
+  # abstain: true            # no answer exists; the reader should say it doesn't know
+  #                          # (an `answer` here only explains why, for the LongMemEval judge)
 - type: forget               # adapter.forget([...]); targets earlier writes by id
   session_id: s1
   target: color-1            # an id or a list of ids
@@ -148,6 +150,57 @@ timestamp is passed to `recall()` as `at`. Without one, steps default to one
 second apart from 2024-01-01; the bundled packs set realistic timestamps
 (days to months apart). A `category: forget` query must follow a forget
 step in its episode; `evidence` ids must be earlier writes in the episode.
+
+### Datasets and synthetic packs
+
+`--pack` also takes a public dataset or a synthetic pack (`membench list`).
+Both are built in memory; nothing is written to disk or committed.
+
+| Pack | What | Size |
+|---|---|---|
+| `longmemeval-s` / `-m` / `-oracle` | [LongMemEval](https://github.com/xiaowu0162/LongMemEval) (MIT), cleaned release | 500 questions, 1 episode each |
+| `locomo` | [LoCoMo](https://github.com/snap-research/locomo) (CC BY-NC 4.0) | 10 conversations, 1,986 questions |
+| `tool-call-memory`, `document-chain`, `multi-step-decisions`, `customer-support-xl`, `coding-assistant-xl` | synthetic generator v2 | 216 queries, 36 per category |
+
+- **Download:** a dataset is fetched on first use from a pinned revision,
+  its sha256 checked, and cached under `~/.cache/membench/datasets/`
+  (`MEMBENCH_CACHE_DIR` overrides `~/.cache/membench`). The manifest records
+  `dataset` (id, revision, sha256, options), so `membench rescore` rebuilds
+  the same pack; it needs the cached file (or network to fetch it again).
+- **LongMemEval:** each haystack turn is a `write` at its session date, the
+  question a `query` at `question_date`; `question_type` → `category`,
+  `_abs` → `abstain`, `has_answer` turns → `evidence`. Ids are opaque (no
+  ground truth reaches the adapter). The reader and QA judge use the
+  official LongMemEval prompts (`qa_style: longmemeval` in the manifest), so
+  `qa_accuracy` (abstention questions included) is comparable to the paper.
+  `-m` is a 2.7 GB file; loading it needs a lot of RAM.
+- **LoCoMo:** dialogue ids → `Event.id` (`conv-26/D1:3`), session dates →
+  timestamps, QA `evidence` → `evidence`, categories → `multi_hop`,
+  `temporal`, `open_domain`, `single_hop`, `adversarial` (→ `abstain`).
+  `membench/datasets/locomo_exclusions.yaml` lists items with broken gold
+  annotations, with reasons. Score a run with and without them:
+  `membench rescore --in report.json --exclude-flagged` (or run with
+  `--exclude-flagged`). Non-commercial license: never redistribute raw or
+  converted files.
+- **Subsets:** `--limit N` keeps the first N queries; `--sample N` a random
+  N stratified by category, seeded by `--seed`. Episodes left without a
+  query are dropped (their writes too). Recorded as `manifest.pack.subset`.
+- **Synthetic:** a deterministic, template-based generator (no LLM): per
+  simulated user, facts spread over 4 sessions days to weeks apart with
+  filler turns, an update chain A→B→C, a multi-hop pair, a temporal "as of"
+  question, an unstated fact (abstention) and a forgotten one. Same seed,
+  same bytes; `--pack-seed` picks another draw. Knobs: `generate/synthetic.py`
+  `Knobs`; templates: `generate/domains.py`.
+- **Inspect:** `membench convert --pack locomo --out locomo.yaml` writes any
+  pack as YAML (local inspection only). `--paraphrase-model <model>` rewrites
+  each query with an LLM so it shares fewer words with its answer turn
+  (needs `MEMBENCH_JUDGE_API_KEY`); run the result as a file pack.
+
+```bash
+membench run --backend chroma --pack longmemeval-s --sample 50 --seed 1 --no-judge
+membench run --backend full-context --pack longmemeval-oracle --reader-model gpt-4o \
+  --reader-base-url https://api.openai.com/v1 --judge-model gpt-4o --judge-base-url https://api.openai.com/v1
+```
 
 ### Failures during a run
 
