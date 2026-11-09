@@ -5,3 +5,4 @@ __pycache__/
 .membench_chroma/
 report.json
 .pytest_cache/
+!results/**/report.json
