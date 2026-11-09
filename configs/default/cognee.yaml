@@ -1,0 +1,4 @@
+# Default (untuned) Cognee config, labelled "default" in published results.
+# Equal to the adapter's built-in defaults; Cognee's own LLM / embedder read LLM_API_KEY.
+top_k: 3
+search_type: CHUNKS

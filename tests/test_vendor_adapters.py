@@ -6,9 +6,11 @@ The shared contract (find / forget / reset / episode isolation) lives in
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 import membench.adapters.cognee as cognee_module
 import membench.adapters.langmem as langmem_module
@@ -219,3 +221,30 @@ def test_provider_prefixed_models_are_priced():
     for handle in ("gpt-4o-mini", "openai:gpt-4o-mini", "openai/gpt-4o-mini"):
         assert _usd(prices, handle, 1_000_000, 1_000_000) == 3.0
     assert _usd(prices, "unknown/model", 1, 0) is None
+
+
+# --- published default configs -------------------------------------------------
+
+CONFIGS = Path(__file__).resolve().parent.parent / "configs" / "default"
+
+
+@pytest.mark.parametrize("path", sorted(CONFIGS.glob("*.yaml")), ids=lambda p: p.stem)
+def test_default_configs_equal_the_adapter_defaults(path, tmp_path, monkeypatch):
+    config = yaml.safe_load(path.read_text())
+    cls = type(FACTORIES[path.stem](tmp_path, monkeypatch))  # installs the SDK fake
+
+    configured, bare = cls(config), cls({})
+
+    assert configured.describe() == bare.describe()
+    assert getattr(configured, "poll", None) == getattr(bare, "poll", None)
+    if "memory_blocks" in config:
+        assert config["memory_blocks"] == letta_module.DEFAULT_BLOCKS
+
+
+def test_every_vendor_backend_has_a_default_config_and_doc():
+    docs = Path(__file__).resolve().parent.parent / "docs"
+    for backend in ("mem0-platform", "zep", "letta", "letta-agent", "langmem", "cognee"):
+        assert (CONFIGS / f"{backend}.yaml").exists(), backend
+    for backend in ("mem0-platform", "zep", "letta", "letta-agent", "langmem", "cognee",
+                    "bm25", "oracle"):
+        assert (docs / f"{backend}.md").exists(), backend

@@ -21,6 +21,7 @@ pip install "membench @ git+https://github.com/imthath-m/membench"
 # optional backends
 pip install "membench[chroma] @ git+https://github.com/imthath-m/membench"   # local vector-store baseline
 pip install "membench[mem0] @ git+https://github.com/imthath-m/membench"     # Mem0 OSS backend
+# also: mem0-platform, zep, letta, langmem, cognee (see "Backends")
 pip install "membench[tokens] @ git+https://github.com/imthath-m/membench"   # exact token counts (tiktoken)
 ```
 
@@ -108,9 +109,35 @@ membench run --backend mem0 --pack customer-support --reader-model claude-haiku-
 
 ### Backends
 
-See `membench list` for the current set. Shipped: `full-context` (baseline,
-no vendor dep), `chroma` (local vector store, no vendor dep), `mem0`
-(`membench[mem0]`, see [docs/mem0.md](docs/mem0.md)).
+See `membench list` for the current set.
+
+| Backend | Kind | Extra | Docs |
+|---|---|---|---|
+| `full-context` | baseline: the whole timestamped log | — | — |
+| `bm25` | baseline: lexical floor (Okapi BM25) | — | [docs/bm25.md](docs/bm25.md) |
+| `oracle` | baseline: only the query's `evidence` (upper bound) | — | [docs/oracle.md](docs/oracle.md) |
+| `chroma` | local vector store | `chroma` | — |
+| `mem0` | Mem0 OSS (local) | `mem0` | [docs/mem0.md](docs/mem0.md) |
+| `mem0-platform` | Mem0 Platform (hosted) | `mem0-platform` | [docs/mem0-platform.md](docs/mem0-platform.md) |
+| `zep` | Zep Cloud (hosted) | `zep` | [docs/zep.md](docs/zep.md) |
+| `letta` | Letta archival passages + core blocks | `letta` | [docs/letta.md](docs/letta.md) |
+| `letta-agent` | Letta agent managing its own memory | `letta` | [docs/letta-agent.md](docs/letta-agent.md) |
+| `langmem` | LangMem memory-store manager | `langmem` | [docs/langmem.md](docs/langmem.md) |
+| `cognee` | Cognee add / cognify / search | `cognee` | [docs/cognee.md](docs/cognee.md) |
+
+Vendor backends run with their vendors' defaults (`configs/default/`);
+vendor-tuned configs are published next to them once reviewed
+([docs/vendor-review.md](docs/vendor-review.md)). `oracle` is the one adapter
+that sees ground truth (the query's `evidence`), by design: report it as an
+upper bound, never as a competitor.
+
+Live runs of the key-gated backends go through the manual
+`.github/workflows/live.yml` (`gh workflow run live.yml -f backend=zep -f
+pack=mini`, or `-f backend=all`); it needs the backend's repository secret
+(`MEM0_API_KEY`, `ZEP_API_KEY`, `LETTA_API_KEY`, or `OPENAI_API_KEY` for
+LangMem / Cognee) plus `MEMBENCH_JUDGE_API_KEY`. Locally:
+`MEMBENCH_LIVE=1 pytest tests/test_live_backends.py` runs `mini` on every
+backend whose key is set.
 
 Pass adapter config with `--backend-config path.yaml` (JSON or YAML mapping,
 merged over `{"persist_dir": --persist-dir}`). Each run starts clean: the
@@ -440,6 +467,8 @@ What the runner guarantees:
 - `describe()` (default `None`) names what shapes results (`llm_model`,
   `llm_base_url`, `temperature`, `embedding_model`, …) for the manifest.
 - Map backend ids back to `Event.id` in `RecalledItem.event_ids`.
+- A backend that ingests asynchronously polls its jobs in `flush()` with
+  `membench.core.poll.drain` (config `poll_interval_s` / `flush_timeout_s`).
 
 `membench/adapters/mem0.py` is the worked example for a real (optional-extra)
 vendor backend, in full:
@@ -555,6 +584,11 @@ Things to note from that example, which apply to any new adapter:
 5. If the backend needs a real vendor account/API key, add it as an
    `optional-dependencies` extra in `pyproject.toml` and a short doc page
    under `docs/` (see `docs/mem0.md`).
+6. **Pass the shared contract suite** (`tests/test_contract_suite.py`): add a
+   factory to `FACTORIES` (an SDK fake from `tests/vendor_fakes.py` for a
+   hosted backend). It checks write → flush → recall finds the event, forget
+   removes it, reset empties, and episodes stay isolated. Add the backend to
+   `tests/test_live_backends.py` and the `live.yml` matrix if it needs keys.
 
 That's the whole surface — `write`, `recall`, `forget`, a registry line, and
 an import guard. Override `flush()`, `reset()`, `usage()` and `describe()`
@@ -575,5 +609,5 @@ After changing dependencies in `pyproject.toml`, run `uv lock` (CI checks
 `python tests/fixtures/make_report.py`. After changing the judge prompt or
 verdict parsing, bump `JUDGE_PROMPT_VERSION`.
 
-More docs: [docs/mem0.md](docs/mem0.md) (Mem0 backend config),
+More docs: per-backend pages (see "Backends"), [docs/vendor-review.md](docs/vendor-review.md),
 [docs/generate.md](docs/generate.md) (transcript-to-pack generator).
