@@ -1,11 +1,11 @@
 # Build progress — roadmap Phases 8–16
-Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the highest phase branch; read this file there; continue the first phase not marked done.
+Start at [HANDOFF.md](HANDOFF.md) (state, PR stack, keys & setup, open-items runbook). Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the top of the stack (currently `claude/gracious-edison-v8eyxs-followup`); read this file there; continue the first item not marked done.
 
 ## Overall status (Phases 8–16)
-All code, tests, workflows and docs are in. What is left needs keys, people or a merge. One checklist:
+All code, tests, workflows and docs are in. What is left needs keys, people or a merge. One checklist; exact steps, expected output and the keys table are in the [HANDOFF.md runbook](HANDOFF.md#open-items-runbook):
 
-- [ ] **Merge the stack to `main`** (#4 → #5 → #6 … #14, in order). Scheduled workflows (`smoke.yml`) only run from the default branch.
-- [ ] **Repository secrets:** `MEMBENCH_JUDGE_API_KEY` (Anthropic judge/reader), `OPENAI_API_KEY` (Mem0 OSS, LangMem, Cognee; OpenAI judge for LongMemEval), `MEM0_API_KEY`, `ZEP_API_KEY`, `LETTA_API_KEY`, `TOGETHER_API_KEY` (open-weight judge). Every item below needs some of these.
+- [ ] **Merge the stack to `main`** (#4 → #5 → #6 … #15, in order). Scheduled and dispatched workflows (`smoke.yml`, `live.yml`, `judge-validation.yml`, `release.yml`) only run from the default branch.
+- [ ] **Repository secrets:** see the [keys & setup table](HANDOFF.md#keys--setup) (minimum for a first live run: `OPENAI_API_KEY` + `MEMBENCH_JUDGE_API_KEY`). Every item below needs some of these.
 - [ ] **P8/P9 first live run:** `gh workflow run live.yml -f backend=mem0 -f pack=customer-support` (`OPENAI_API_KEY`, `MEMBENCH_JUDGE_API_KEY`).
 - [ ] **P10 cost check:** after that run, compare `live-report.json` `cost.backend` / `cost.judge` with the OpenAI + Anthropic usage dashboards (within 5%); re-verify the OpenAI rows of `membench/prices.yaml` first.
 - [ ] **P11 reader metrics live:** `gh workflow run live.yml -f backend=mem0 -f pack=customer-support -f reader_model=claude-haiku-4-5`.
@@ -33,6 +33,7 @@ All code, tests, workflows and docs are in. What is left needs keys, people or a
 | 14 | claude/gracious-edison-v8eyxs-phase-14 | #12 | done (live vendor runs blocked) |
 | 15 | claude/gracious-edison-v8eyxs-phase-15 | #13 | done (human labels + cross-judge runs blocked) |
 | 16 | claude/gracious-edison-v8eyxs-phase-16 | #14 | done (live rows, 7-day smoke, PyPI publish blocked) |
+| Follow-up | claude/gracious-edison-v8eyxs-followup | (pending) | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -263,7 +264,7 @@ Status: in progress
 - [x] Regenerate fixture report (`tests/fixtures/make_report.py`)
 - [x] Re-score committed `results/` + re-derive `results/README.md`; update `docs/comparison.md` numbers
 - [x] Remove the bug from known-issue lists
-- [ ] `docs/HANDOFF.md` (state, PR stack, keys & setup table, open-items runbook, caveats, agent conventions)
+- [x] `docs/HANDOFF.md` (state, PR stack, keys & setup table, open-items runbook, caveats, agent conventions)
 - [ ] Root `CLAUDE.md` + README pointer; "Overall status" consistent with HANDOFF; no stale statements
 - [ ] Checks: pytest, ruff, `uv lock --check`, results rescore + leaderboard diff
 - [ ] PR opened; number recorded here and in HANDOFF
