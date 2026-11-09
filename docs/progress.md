@@ -154,9 +154,9 @@ Status: done (with blocked items)
 
 ## Phase 14 — Backend coverage
 Status: in progress
-- [ ] Shared adapter contract test suite (write → flush → recall finds it; forget removes it; reset empties; episode isolation)
-- [ ] `bm25` baseline (lexical floor, offline)
-- [ ] `oracle` baseline (only the query's `evidence` events; reader upper bound)
+- [x] Shared adapter contract test suite (write → flush → recall finds it; forget removes it; reset empties; episode isolation)
+- [x] `bm25` baseline (lexical floor, offline)
+- [x] `oracle` baseline (only the query's `evidence` events; reader upper bound)
 - [ ] Mem0 Platform (`MemoryClient`; `flush()` polls async ingestion; namespace per episode)
 - [ ] Zep Cloud (user graph; graph search; `flush()` waits for ingestion; `at` via bi-temporal facts)
 - [ ] Letta archival passages + core blocks; separate `letta-agent` (agent-managed memory via messages)

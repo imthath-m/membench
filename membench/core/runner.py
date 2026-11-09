@@ -199,6 +199,8 @@ def run_pack(
                 pending_ingest = False
                 error = error and f"flush: {error}"
             if error is None:
+                if adapter.sees_evidence:  # oracle upper bound only
+                    adapter.evidence = list(step.evidence)
                 before = _usage_total(adapter)
                 result, latency_ms, retries, error = call(
                     lambda step=step: adapter.recall(

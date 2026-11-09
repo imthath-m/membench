@@ -5,7 +5,10 @@ from membench.core.registry import get_adapter_class, list_backends
 
 
 def test_list_backends():
-    assert list_backends() == ["chroma", "full-context", "mem0"]
+    assert list_backends() == [
+        "bm25", "chroma", "cognee", "full-context", "langmem", "letta", "letta-agent", "mem0",
+        "mem0-platform", "oracle", "zep",
+    ]
 
 
 def test_get_adapter_class_full_context():

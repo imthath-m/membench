@@ -11,6 +11,7 @@ model is missing from the table gets `usd: None`, and so does the total.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,9 @@ def load_prices(path: str | Path = PRICES_PATH) -> dict[str, Any]:
 def _usd(prices: dict, model: str | None, input_tokens: int, output_tokens: int = 0) -> float | None:
     if not input_tokens and not output_tokens:
         return 0.0
-    rate = prices["models"].get(model) if model else None
+    # Provider-prefixed handles ("openai:gpt-4o-mini", "openai/gpt-4o-mini") price as the bare id.
+    table = prices["models"]
+    rate = (table.get(model) or table.get(re.split(r"[:/]", model)[-1])) if model else None
     if rate is None:
         return None
     return (input_tokens * rate.get("input", 0) + output_tokens * rate.get("output", 0)) / 1e6
