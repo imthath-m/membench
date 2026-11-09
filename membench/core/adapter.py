@@ -59,10 +59,13 @@ class MemoryAdapter(ABC):
 
     Construction takes a plain dict of config (from pack/CLI config).
     `retryable` lists transient exception types (rate limits, timeouts) the
-    runner retries with backoff; anything else fails the step.
+    runner retries with backoff; anything else fails the step. `packages` and
+    `deployment` (plus `describe()`) feed the run manifest.
     """
 
     retryable: tuple[type[BaseException], ...] = ()
+    packages: tuple[str, ...] = ()  # backend SDK distributions whose versions the manifest records
+    deployment: str = "local"  # "local" | "hosted"; a hosted region comes from config["region"]
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config = config or {}
@@ -86,5 +89,14 @@ class MemoryAdapter(ABC):
         """Clear any state persisted by earlier runs or episodes. Default: no-op."""
 
     def usage(self) -> dict[str, int] | None:
-        """Cumulative backend LLM/embedding token counts, or None if not tracked."""
+        """Cumulative backend token counts, or None if not tracked.
+
+        Keys: `llm_input_tokens`, `llm_output_tokens`, `embedding_tokens`; priced
+        against the `llm_model` / `embedding_model` from `describe()`.
+        """
+        return None
+
+    def describe(self) -> dict[str, Any] | None:
+        """Models and settings that shape results (e.g. `llm_model`, `llm_base_url`,
+        `temperature`, `embedding_model`), or None. Recorded in the run manifest."""
         return None

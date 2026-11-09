@@ -49,6 +49,8 @@ class RunResult:
     scores: dict[str, Any] = field(default_factory=dict)
     usage: dict[str, int] | None = None  # adapter.usage(): backend LLM/embedding tokens
     valid: bool = True
+    manifest: dict[str, Any] = field(default_factory=dict)  # see core.manifest
+    cost: dict[str, Any] | None = None  # see core.cost
 
 
 def _call_with_timeout(fn: Callable[[], Any], timeout: float | None) -> Any:
@@ -114,6 +116,8 @@ def run_pack(
     judge: Any = None,
     step_timeout: float | None = DEFAULT_STEP_TIMEOUT_S,
     tokenizer: Callable[[str], int] = count_tokens,
+    seed: int = 0,
+    repeat: int = 0,
 ) -> RunResult:
     """Replay every step in `pack` against `adapter` in order.
 
@@ -123,7 +127,14 @@ def run_pack(
     `context`. `adapter.reset()` runs between episodes; if it fails, every
     step of that episode is recorded as an error. `adapter.flush()` runs
     before a query that follows writes or forgets, timed as `ingest_latency_ms`.
+    `seed` seeds every seedable RNG first; it and `repeat` (the repeat index)
+    are recorded in the run manifest.
     """
+    from membench.core.cost import compute_cost
+    from membench.core.manifest import build_manifest, seed_everything
+    from membench.core.scoring import score_run
+
+    seed_everything(seed)
     started_at = datetime.now(timezone.utc).isoformat()
     traces: list[StepTrace] = []
     episode, reset_error, pending_ingest = 0, None, False
@@ -204,10 +215,20 @@ def run_pack(
     usage, _, _, _ = _run_step(adapter.usage, adapter, len(pack.steps), step_timeout)
     finished_at = datetime.now(timezone.utc).isoformat()
 
-    from membench.core.scoring import score_run
-
     scores = score_run(pack, traces, judge)
     error_rate = scores["error_rate"]
+    manifest = build_manifest(
+        pack=pack, adapter=adapter, backend_name=backend_name, judge=judge,
+        tokenizer=tokenizer, seed=seed, repeat=repeat,
+        started_at=started_at, finished_at=finished_at,
+    )
+    cost = compute_cost(
+        judge_model=getattr(judge, "model", None),
+        judge_usage=getattr(judge, "usage", None),
+        backend_models=manifest["backend"]["models"],
+        backend_usage=usage,
+        n_queries=sum(t.step_type == "query" for t in traces),
+    )
     return RunResult(
         pack_name=pack.name,
         backend_name=backend_name,
@@ -217,4 +238,6 @@ def run_pack(
         scores=scores,
         usage=usage,
         valid=error_rate is None or error_rate <= MAX_ERROR_RATE,
+        manifest=manifest,
+        cost=cost,
     )

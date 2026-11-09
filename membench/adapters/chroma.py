@@ -20,6 +20,8 @@ except ImportError:  # pragma: no cover - exercised only when chromadb missing
 class ChromaAdapter(MemoryAdapter):
     """Local, offline vector-store baseline (no network, no API key)."""
 
+    packages = ("chromadb",)
+
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         if chromadb is None:
             raise ImportError(
@@ -68,3 +70,7 @@ class ChromaAdapter(MemoryAdapter):
     def reset(self) -> None:
         self._client.delete_collection(self._collection_name)
         self._collection = self._client.get_or_create_collection(self._collection_name)
+
+    def describe(self) -> dict[str, Any]:
+        # The collection uses Chroma's default embedder: the ONNX all-MiniLM-L6-v2.
+        return {"embedding_model": "all-MiniLM-L6-v2", "top_k": self.top_k}

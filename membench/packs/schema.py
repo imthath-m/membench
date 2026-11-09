@@ -15,6 +15,8 @@ the runner calls `reset()` between episodes. Each step is one of:
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -82,11 +84,16 @@ Step = WriteStep | QueryStep | ForgetStep
 
 @dataclass
 class Pack:
-    """`steps` is flat across episodes; each step's `episode` is its index."""
+    """`steps` is flat across episodes; each step's `episode` is its index.
+
+    `sha256` hashes the parsed pack content (canonical JSON), so whitespace
+    and comments don't change it; the run manifest records it.
+    """
 
     name: str
     description: str
     steps: list[Step]
+    sha256: str = ""
 
 
 def _require(d: dict, field_name: str, step_index: int) -> Any:
@@ -196,7 +203,8 @@ def parse_pack(raw: Any, default_name: str = "pack") -> Pack:
             )
         steps += [_parse_step(s, len(steps) + i, episode) for i, s in enumerate(raw_steps)]
     _check_ids(steps)
-    return Pack(name=name, description=description, steps=steps)
+    digest = hashlib.sha256(json.dumps(raw, sort_keys=True, default=str).encode()).hexdigest()
+    return Pack(name=name, description=description, steps=steps, sha256=digest)
 
 
 def load_pack(path: str | Path) -> Pack:

@@ -54,12 +54,12 @@ Status: done
 
 ## Phase 10 — Reproducibility + cost accounting
 Status: in progress
-- [ ] Run manifest in every report (schema_version, membench version + git commit/dirty, Python/OS, backend SDK versions, redacted backend config, pack name + sha256, dataset slot, judge/reader/backend models + base URLs, judge prompt version, tokenizer, seed, repeat index, deployment, start/finish)
+- [x] Run manifest in every report (schema_version, membench version + git commit/dirty, Python/OS, backend SDK versions, redacted backend config, pack name + sha256, dataset slot, judge/reader/backend models + base URLs, judge prompt version, tokenizer, seed, repeat index, deployment, start/finish)
 - [ ] `JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`
-- [ ] Judge `--strict-cache` (cache miss is an error)
-- [ ] `membench rescore --in report.json` (no adapter, no network)
+- [x] Judge `--strict-cache` (cache miss is an error)
+- [x] `membench rescore --in report.json` (no adapter, no network)
 - [ ] `uv.lock` + frozen sync for published (live) runs; floor versions kept
 - [ ] Cost tracking: judge / reader / backend tokens from API `usage`; dated price table → USD per run and per 1k queries (Mem0 `usage()`)
 - [ ] Determinism: seed, embedding model id + temperature recorded; non-determinism documented
-- [ ] Committed JSON Schema; every report validates (test)
+- [x] Committed JSON Schema; every report validates (test)
 - [ ] CI test: `rescore` on a committed report reproduces identical scores offline

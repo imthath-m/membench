@@ -1,0 +1,27 @@
+# Dated price table for cost accounting: USD per 1M tokens.
+# `membench run` prices the judge, reader and backend token counts (from API
+# `usage`) against this table; a model missing here gets `usd: null`.
+# Re-check every row against the provider's pricing page before publishing a
+# cost, and bump `as_of` when you do.
+as_of: "2026-10-06"
+sources:
+  anthropic: https://www.anthropic.com/pricing  # Claude rows checked 2026-10-06
+  openai: https://openai.com/api/pricing  # OpenAI rows: re-verify before publishing
+models:
+  # Anthropic (judge / reader)
+  claude-fable-5-1: {input: 10.00, output: 50.00}
+  claude-fable-5: {input: 10.00, output: 50.00}
+  claude-opus-5-5: {input: 4.00, output: 20.00}
+  claude-opus-5: {input: 5.00, output: 25.00}
+  claude-opus-4-8: {input: 5.00, output: 25.00}
+  claude-sonnet-5-5: {input: 2.00, output: 10.00}
+  claude-sonnet-5: {input: 2.00, output: 10.00}
+  claude-sonnet-4-6: {input: 3.00, output: 15.00}
+  claude-haiku-5-5: {input: 0.10, output: 0.50}
+  claude-haiku-4-5: {input: 1.00, output: 5.00}
+  # OpenAI (Mem0's default LLM + embedder)
+  gpt-5-mini: {input: 0.25, output: 2.00}
+  gpt-4.1-nano: {input: 0.10, output: 0.40}
+  gpt-4o-mini: {input: 0.15, output: 0.60}
+  text-embedding-3-small: {input: 0.02}
+  text-embedding-3-large: {input: 0.13}
