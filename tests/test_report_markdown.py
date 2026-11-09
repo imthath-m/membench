@@ -57,3 +57,31 @@ def test_single_report_shows_error_rate_and_invalid_flag():
     md = render_markdown([report])
     assert "| Error rate | 25% |" in md
     assert "**Valid:** no" in md
+
+
+def _categorized(backend="full-context", tokenizer="whitespace:approx"):
+    report = _report(backend=backend)
+    report["manifest"] = {"tokenizer": tokenizer}
+    report["by_category"] = {
+        "temporal": {"n": 2, "recall_precision": 0.5, "evidence_recall_at_k": 1.0,
+                     "semantic_recall": None, "qa_accuracy": None},
+        "update": {"n": 3, "recall_precision": 1.0, "evidence_recall_at_k": None,
+                   "semantic_recall": None, "qa_accuracy": 0.25},
+    }
+    return report
+
+
+def test_single_report_has_per_category_table_and_approx_tokens():
+    md = render_markdown([_categorized()])
+    assert "## By category" in md
+    assert "| temporal | 2 | 50% | 100% | n/a | n/a |" in md
+    assert "| update | 3 | 100% | n/a | n/a | 25% |" in md
+    assert "42.00 (approx)" in md
+    assert "**Tokenizer:** whitespace:approx" in md
+    assert "(approx)" not in render_markdown([_categorized(tokenizer="tiktoken:o200k_base")])
+
+
+def test_comparison_has_recall_precision_by_category():
+    md = render_markdown([_categorized("a"), _categorized("b")])
+    assert "## Recall precision by category" in md
+    assert "| temporal | 50% | 50% |" in md
