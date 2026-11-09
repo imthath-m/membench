@@ -130,7 +130,7 @@ Status: done (with blocked items)
   - Real-data runs here (no judge): full-context LongMemEval_S (247k writes, 500 q) 67 s, report 622 MB (contexts are stored on traces — consider trimming for large runs); full-context LoCoMo 30 s. Chroma's adapter is slow (~5 writes/s on this 4-CPU box), so LongMemEval_S on chroma was run with `--limit 5`; a full S run is ~14 h at that rate.
 
 ## Phase 13 — Statistical rigor
-Status: in progress
+Status: done (with blocked items)
 - [x] `--repeats N` (default 3 when backend or judge/reader uses an LLM, else 1); fresh `reset()` + new namespace per repeat; report holds mean, run-to-run SD, every repeat
 - [x] 95% CIs: seeded bootstrap over queries (10k resamples) / Wilson for plain proportions, next to every rate
 - [x] Paired comparison (`membench compare`): paired bootstrap of the difference + McNemar for pass/fail metrics; flags differences whose CI includes 0
@@ -138,7 +138,8 @@ Status: in progress
 - [x] Holm correction in comparison reports (metrics × categories)
 - [x] md/html reports show n + CI for every metric; suppress/label below min n
 - [x] `rescore` reproduces CIs (seeded); schema + fixture regenerated
-- [ ] Two runs of the same config have overlapping CIs (offline demo on full-context / chroma)
+- [x] Two runs of the same config have overlapping CIs (offline demo on full-context / chroma): `membench run --backend {full-context,chroma} --pack tool-call-memory --no-judge --repeats 2` → both repeats' CIs identical (deterministic backends), e.g. chroma recall_precision 94.4% [89.4–97.2%], evidence_recall@k 87.8% [83.3–92.0%]; chroma used collections `membench-r0` / `membench-r1`; `membench rescore --check` identical on both reports. Also `membench compare` full-context vs chroma on that pack: evidence_recall@k −12.2pp [−16.7, −8.0] real difference; recall_precision −5.6pp (McNemar p 0.008, Holm 0.086, not significant after Holm).
+- Blocked: overlapping CIs across repeats of an LLM-backed run (Mem0 and/or reader/judge) — needs `OPENAI_API_KEY` + `MEMBENCH_JUDGE_API_KEY`. Once secrets exist: `gh workflow run live.yml -f pack=customer-support -f repeats=3` (or locally `membench run --backend mem0 --pack customer-support --judge --repeats 3 --out r.json`), then check `repeat_summary` SDs and that each repeat's `stats.scores[*].ci` overlap; `membench rescore --in r.json --check`.
 - [x] Tests + README docs
 - Notes for next phases:
   - Report (schema stays v2; new keys optional in the schema, always written): `outcomes` = {metric: {"<step_index>": bool | number}} for the 11 query-level metrics (`scoring.OUTCOMES`); `stats` = {"scores": {metric: stat}, "by_category": {cat: {metric: stat}}}, stat = {n, ci: [lo, hi] | null, method: "wilson" | "bootstrap" | null, indicative}; `repeats` = full reports of repeats 1..N-1 (schema `$ref: "#"`, no nesting); `repeat_summary` = {n, scores: {metric: {mean, sd, values}}} or null.
