@@ -1,6 +1,9 @@
 name: Live run
 
-# Manual only: spends real API credit. Needs repository secrets
+# Manual only: spends real API credit. This is also how full benchmark runs are made
+# (e.g. pack=tool-call-memory, backend=all): they are too costly and noisy to schedule.
+# Each job publishes its run (`membench publish`) into a `results/` artifact to review
+# and commit. Needs repository secrets
 # MEMBENCH_JUDGE_API_KEY, OPENAI_API_KEY (Mem0 OSS / LangMem / Cognee LLM + embedder)
 # and, per hosted backend, MEM0_API_KEY / ZEP_API_KEY / LETTA_API_KEY.
 on:
@@ -26,6 +29,11 @@ on:
       repeats:
         description: "Repeats of the run (fresh mem0 user_id each; report holds mean + SD)"
         default: "3"
+      config:
+        description: "Backend config: configs/<config>/<backend>.yaml when present"
+        type: choice
+        default: "default"
+        options: [default, vendor-tuned]
 
 jobs:
   mem0:
@@ -64,13 +72,18 @@ jobs:
           JUDGE_BASE_URL: ${{ inputs.judge_base_url }}
           READER_MODEL: ${{ inputs.reader_model }}
           REPEATS: ${{ inputs.repeats }}
+          CONFIG: ${{ inputs.config }}
         run: |
           args=()
           if [ -n "$JUDGE_BASE_URL" ]; then args+=(--judge-base-url "$JUDGE_BASE_URL"); fi
           if [ -n "$READER_MODEL" ]; then args+=(--reader-model "$READER_MODEL"); fi
+          if [ -f "configs/$CONFIG/mem0.yaml" ]; then
+            args+=(--backend-config "configs/$CONFIG/mem0.yaml")
+          fi
           membench run --backend mem0 --pack "$PACK" --judge --judge-model "$JUDGE_MODEL" \
             --repeats "$REPEATS" "${args[@]}" --out live-report.json
           membench rescore --in live-report.json --check
+          membench publish --in live-report.json --config "$CONFIG"
           membench report --in live-report.json --format md --out live-report.md
           cat live-report.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -83,6 +96,7 @@ jobs:
             live-report.json
             live-report.md
             .membench_judge_cache.json
+            results/
           if-no-files-found: warn
 
   backends:
@@ -143,13 +157,18 @@ jobs:
           JUDGE_BASE_URL: ${{ inputs.judge_base_url }}
           READER_MODEL: ${{ inputs.reader_model }}
           REPEATS: ${{ inputs.repeats }}
+          CONFIG: ${{ inputs.config }}
         run: |
           args=()
           if [ -n "$JUDGE_BASE_URL" ]; then args+=(--judge-base-url "$JUDGE_BASE_URL"); fi
           if [ -n "$READER_MODEL" ]; then args+=(--reader-model "$READER_MODEL"); fi
+          if [ -f "configs/$CONFIG/$BACKEND.yaml" ]; then
+            args+=(--backend-config "configs/$CONFIG/$BACKEND.yaml")
+          fi
           membench run --backend "$BACKEND" --pack "$PACK" --judge --judge-model "$JUDGE_MODEL" \
             --repeats "$REPEATS" "${args[@]}" --out "live-$BACKEND.json"
           membench rescore --in "live-$BACKEND.json" --check
+          membench publish --in "live-$BACKEND.json" --config "$CONFIG"
           membench report --in "live-$BACKEND.json" --format md --out "live-$BACKEND.md"
           cat "live-$BACKEND.md" >> "$GITHUB_STEP_SUMMARY"
 
@@ -162,4 +181,5 @@ jobs:
             live-${{ matrix.backend }}.json
             live-${{ matrix.backend }}.md
             .membench_judge_cache.json
+            results/
           if-no-files-found: warn

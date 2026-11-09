@@ -13,7 +13,7 @@ Claude by default).
 
 ## Install
 
-Not published to PyPI yet; install from GitHub:
+Not published to PyPI yet (v0.2.0 is prepared: `release.yml`); install from GitHub:
 
 ```bash
 pip install "membench @ git+https://github.com/imthath-m/membench"
@@ -421,6 +421,43 @@ table, [`membench/prices.yaml`](membench/prices.yaml) (USD per 1M tokens):
 - `total_usd` and `usd_per_1k_queries`. A model missing from the table gets
   `usd: null`, and so does the total. Re-check the table against the
   providers' pricing pages before publishing a cost.
+
+## Published results
+
+Committed runs live in `results/<YYYY-MM-DD>/<dataset>/<backend>/`
+(`report.json`, the `judge_cache.json` entries it replays, and `meta.json`
+with the `uv.lock` sha256, config label and what was trimmed). The table is
+[results/README.md](results/README.md); the draft write-up is
+[docs/comparison.md](docs/comparison.md).
+
+```bash
+membench publish --in report.json            # checks it re-scores identically, then copies it in
+membench publish --in report.json --config vendor-tuned   # its own `<backend>-vendor-tuned` row
+membench leaderboard results/ --out results/README.md
+membench report --in report.json --failures --out failures.md   # --excerpt-chars 0: ids only
+```
+
+- `publish` writes compact JSON and drops recalled item texts (scoring never
+  reads them; contexts stay so `rescore` reproduces every score). Don't
+  publish raw text from licensed datasets: LoCoMo results are ids only.
+- `leaderboard`: one backend × metric table per dataset, judge model + prompt
+  version and reader (never mixed), with value, 95% CI and n (`†` below the
+  reporting minimum), tokens per query, recall p95, USD per 1k queries and
+  error rate. Metrics null for every row (judge metrics without a judge) are
+  left out; judge metrics show their validation status; `oracle` is labelled
+  an upper bound.
+- `report --failures`: each failed query sorted into not retrieved / stale
+  surfaced / retrieved but answered wrong / false abstention / forget
+  violation, with expected evidence ids, recalled ids and a context excerpt.
+
+CI (`.github/workflows/`): every PR re-scores each committed result offline
+(strict judge cache) and checks `results/README.md` re-derives identically
+(`ci.yml`); `smoke.yml` runs `mini` with the judge on each live backend
+nightly (frozen `uv.lock`) and weekly on the latest unpinned dependencies,
+skipping backends without secrets and opening an issue on failure; full
+benchmark runs are manual only (`live.yml`, which uploads a `results/`
+artifact to commit). Releases: `release.yml` publishes to PyPI with trusted
+publishing on a `v*` tag.
 
 ## Writing a new adapter
 

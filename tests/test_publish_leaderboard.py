@@ -104,8 +104,9 @@ def test_leaderboard_groups_by_judge_and_labels_rows(tmp_path):
 
 
 def test_leaderboard_cli_and_committed_readme_is_up_to_date(tmp_path):
-    out = tmp_path / "README.md"
     shutil.copytree(ROOT / "results", tmp_path / "results")
+    out = tmp_path / "results" / "README.md"
+    out.unlink()
 
     _invoke("leaderboard", tmp_path / "results", "--out", out)
 

@@ -54,6 +54,33 @@ jobs:
           membench rescore --in tests/fixtures/report_customer_support.json \
             --judge-cache tests/fixtures/judge_cache_customer_support.json --check
 
+  results:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install membench (dev extra)
+        run: pip install -e ".[dev]"
+
+      # Strict judge cache: rescore replays only the result's own judge_cache.json and
+      # fails on a miss; no adapter, no API key.
+      - name: Re-score every committed result offline
+        run: |
+          for report in results/*/*/*/report.json; do
+            membench rescore --in "$report" --judge-cache "$(dirname "$report")/judge_cache.json" \
+              --check
+          done
+
+      - name: results/README.md re-derives identically
+        run: |
+          membench leaderboard results/ --out results/README.md
+          git diff --exit-code results/README.md
+
   lock:
     runs-on: ubuntu-latest
     steps:
