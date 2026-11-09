@@ -163,7 +163,7 @@ Status: in progress
 - [ ] LangMem (memory-store manager over a LangGraph `BaseStore`; recall `store.search`)
 - [ ] Cognee (`add` / `flush()` → `cognify` / `search` / `reset()` prunes; async wrapped)
 - [ ] Per backend: optional extra, import guard, `docs/<backend>.md`, mocked unit tests, gated live test
-- [ ] `live.yml`: matrix over the hosted backends (secret-gated, manual dispatch)
+- [x] `live.yml`: matrix over the hosted backends (secret-gated, manual dispatch)
 - [ ] Vendor review: draft issue text + default / vendor-tuned config slots (`docs/vendor-review.md`)
 - [ ] README + registry + `uv.lock`
 - [ ] Done-when: all 5 run `mini` live via `live.yml`
