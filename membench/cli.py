@@ -29,11 +29,33 @@ from membench.core.scoring.judge import (
     DEFAULT_JUDGE_MODEL,
     JUDGE_PROMPT_VERSION,
     CacheMissError,
+    JudgeCache,
     build_judge,
     resolve_client,
 )
 from membench.core.stats import summarize_repeats
 from membench.core.tokens import default_tokenizer
+from membench.core.validation.agreement import agreement_report, render_agreement_markdown
+from membench.core.validation.cross import (
+    build_panel_judge,
+    load_panel,
+    run_judges,
+    share_cache,
+)
+from membench.core.validation.labels import (
+    gold,
+    load_labels,
+    merge_annotations,
+    read_jsonl,
+    write_jsonl,
+)
+from membench.core.validation.sample import (
+    DEFAULT_N_PER_METRIC,
+    judge_items,
+    sample_summary,
+    stratified_sample,
+)
+from membench.core.validation.status import agreement_path
 from membench.datasets import DATASETS, SYNTHETIC, resolve_pack, select_queries
 from membench.generate.generator import GenerationError, generate_pack
 from membench.generate.synthetic import paraphrase_queries
@@ -369,20 +391,8 @@ def rescore(
     """
     try:
         report_data = json.loads(in_path.read_text())
-        manifest = report_data.get("manifest") or {}
-        if "pack" not in manifest:
-            raise ValueError(f"{in_path} has no run manifest (made before membench 0.2.x)")
-        dataset = manifest.get("dataset") or {}
-        loaded_pack = resolve_pack(
-            pack or dataset.get("id") or manifest["pack"]["name"],
-            **dataset.get("options", {}), **(manifest["pack"].get("subset") or {}),
-        )
-        if loaded_pack.sha256 != manifest["pack"]["sha256"]:
-            raise ValueError(
-                f"pack {loaded_pack.name!r} content (sha256 {loaded_pack.sha256[:12]}…) differs "
-                f"from the run's ({manifest['pack']['sha256'][:12]}…)"
-            )
-        judge_info = manifest.get("judge")
+        loaded_pack = _report_pack(report_data, in_path, pack)
+        judge_info = report_data["manifest"].get("judge")
         judge_obj = None
         if judge_info is not None:
             if judge_info["prompt_version"] != JUDGE_PROMPT_VERSION:
@@ -436,6 +446,24 @@ def rescore(
         typer.echo(f"Re-scored: {name} {old} -> {new}", err=True)
     if check:
         raise typer.Exit(code=1)
+
+
+def _report_pack(report_data: dict, path: Path, pack: str | None = None) -> Pack:
+    """The pack a report ran on (from `--pack` or its manifest), sha256-checked."""
+    manifest = report_data.get("manifest") or {}
+    if "pack" not in manifest:
+        raise ValueError(f"{path} has no run manifest (made before membench 0.2.x)")
+    dataset = manifest.get("dataset") or {}
+    loaded_pack = resolve_pack(
+        pack or dataset.get("id") or manifest["pack"]["name"],
+        **dataset.get("options", {}), **(manifest["pack"].get("subset") or {}),
+    )
+    if loaded_pack.sha256 != manifest["pack"]["sha256"]:
+        raise ValueError(
+            f"pack {loaded_pack.name!r} content (sha256 {loaded_pack.sha256[:12]}…) differs "
+            f"from the run's ({manifest['pack']['sha256'][:12]}…)"
+        )
+    return loaded_pack
 
 
 def _rescore_run(run: dict, pack: Pack, judge: object, kept: list[int] | None) -> dict:
@@ -500,6 +528,143 @@ def convert(
         raw = paraphrase_queries(raw, client)
     out.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True))
     typer.echo(f"Wrote pack {loaded_pack.name!r} to {out} (local inspection only)")
+
+
+_VALIDATION = Path("validation")
+
+
+@app.command(name="judge-sample")
+def judge_sample(
+    in_paths: list[Path] = typer.Option(
+        ..., "--in", help="Run report(s) to sample judge items from (one per backend/pack)."
+    ),
+    out: Path = typer.Option(_VALIDATION / "sample.jsonl", "--out", help="Sample JSONL."),
+    n: int = typer.Option(
+        DEFAULT_N_PER_METRIC, "--n", min=1, help="Items per judge metric (fewer if the pool "
+        "is smaller)."
+    ),
+    seed: int = typer.Option(0, "--seed", help="Sampling seed."),
+    judge_cache: Path = typer.Option(
+        Path(".membench_judge_cache.json"), "--judge-cache",
+        help="Judge cache for each item's verdict (stratum `unjudged` when absent).",
+    ),
+    judge_model: str = typer.Option(
+        DEFAULT_JUDGE_MODEL, "--judge-model",
+        help="Judge whose cached verdicts to use when a report ran without a judge.",
+    ),
+) -> None:
+    """Stratified sample of judge items (rubric or question+answer, evidence) for human
+    labelling: per metric, round-robin over backend × verdict × context-length bucket."""
+    cache = JudgeCache(judge_cache) if judge_cache.exists() else None
+    items = []
+    try:
+        for path in in_paths:
+            report_data = json.loads(path.read_text())
+            model = (report_data["manifest"].get("judge") or {}).get("model") or judge_model
+            items += judge_items(report_data, _report_pack(report_data, path), cache, model)
+    except (PackValidationError, ValueError, TypeError, KeyError, OSError,
+            yaml.YAMLError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    sample = stratified_sample(items, n, seed)
+    write_jsonl(out, sample)
+    typer.echo(f"Wrote {len(sample)} items from {len(items)} judge calls to {out}")
+    for metric, strata in sample_summary(sample).items():
+        typer.echo(f"  {metric}: {sum(strata.values())} items, {len(strata)} strata")
+        if sum(strata.values()) < n:
+            typer.echo(f"  Warning: {metric} has fewer than {n} distinct items", err=True)
+
+
+@app.command(name="judge-labels")
+def judge_labels(
+    sample: Path = typer.Option(_VALIDATION / "sample.jsonl", "--sample", help="Sample JSONL."),
+    annotator: list[str] = typer.Option(
+        ..., "--annotator", help="NAME=PATH of one annotator's JSONL ({item_id, label, note?}); "
+        "repeat for each (>= 2).",
+    ),
+    adjudication: Path = typer.Option(
+        None, "--adjudication", help="JSONL of adjudicated labels for disagreements."
+    ),
+    out: Path = typer.Option(_VALIDATION / "labels.jsonl", "--out", help="Labels JSONL."),
+) -> None:
+    """Merge independent annotators (and adjudication) into a validated labels file."""
+    try:
+        files = dict(spec.split("=", 1) for spec in annotator)
+        lines = merge_annotations(
+            read_jsonl(sample), {name: read_jsonl(path) for name, path in files.items()},
+            read_jsonl(adjudication) if adjudication else None,
+        )
+    except (ValueError, OSError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    write_jsonl(out, lines)
+    pending = sum(gold(line) is None for line in lines)
+    typer.echo(f"Wrote {len(lines)} labelled items to {out} ({pending} need adjudication)")
+
+
+@app.command(name="judge-cross")
+def judge_cross(
+    sample: Path = typer.Option(_VALIDATION / "sample.jsonl", "--sample", help="Sample JSONL."),
+    judges: Path = typer.Option(
+        Path("configs/judges.yaml"), "--judges", help="Judge panel YAML (name, model, "
+        "base_url, api_key_env)."
+    ),
+    judge_cache: Path = typer.Option(
+        _VALIDATION / "judge_cache.json", "--judge-cache", help="Judge cache (all judges)."
+    ),
+    strict_cache: bool = typer.Option(
+        False, "--strict-cache", help="Replay from the cache only; a miss is an error."
+    ),
+    out: Path = typer.Option(
+        None, "--out", help=f"Verdicts JSONL (default validation/verdicts-v"
+        f"{JUDGE_PROMPT_VERSION}.jsonl).",
+    ),
+) -> None:
+    """Run every judge of the panel on the same sampled items (one verdict row each)."""
+    out = out or _VALIDATION / f"verdicts-v{JUDGE_PROMPT_VERSION}.jsonl"
+    try:
+        items = read_jsonl(sample)
+        panel = {c.name: build_panel_judge(c, judge_cache, strict_cache)
+                 for c in load_panel(judges)}
+        share_cache(panel, judge_cache)
+        rows = run_judges(items, panel)
+    except (ValueError, TypeError, OSError, CacheMissError, yaml.YAMLError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    write_jsonl(out, rows)
+    errors = sum(r["passed"] is None for r in rows)
+    typer.echo(f"Wrote {len(rows)} verdicts ({len(panel)} judges x {len(items)} items, "
+               f"{errors} errors) to {out}")
+
+
+@app.command(name="judge-agreement")
+def judge_agreement(
+    labels: Path = typer.Option(None, "--labels", help="Human labels JSONL."),
+    verdicts: Path = typer.Option(None, "--verdicts", help="Judge verdicts JSONL (judge-cross)."),
+    out: Path = typer.Option(
+        None, "--out", help=f"Agreement JSON (default validation/agreement-v"
+        f"{JUDGE_PROMPT_VERSION}.json); a Markdown copy is written next to it.",
+    ),
+) -> None:
+    """Human–human κ, judge–human κ / accuracy / false-pass / false-fail (also by context
+    length), judge–judge κ and disagreements; marks each judge metric validated or not."""
+    if labels is None and verdicts is None:
+        typer.echo("Error: give --labels and/or --verdicts", err=True)
+        raise typer.Exit(code=1)
+    try:
+        result = agreement_report(load_labels(labels) if labels else None,
+                                  read_jsonl(verdicts) if verdicts else None)
+    except (ValueError, KeyError, OSError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    out = out or agreement_path(result["prompt_version"], _VALIDATION)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(result, indent=2) + "\n")
+    out.with_suffix(".md").write_text(render_agreement_markdown(result))
+    typer.echo(f"Wrote judge agreement (prompt v{result['prompt_version']}) to {out}")
+    for name, info in sorted(result["judges"].items()):
+        for metric, m in info["metrics"].items():
+            typer.echo(f"  {name} {metric}: kappa {m['kappa']} n={m['n']} {m['status']}")
 
 
 @app.command(name="list")

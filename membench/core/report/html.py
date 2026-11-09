@@ -13,6 +13,7 @@ from html import escape
 
 from membench.core.report.markdown import (
     _CATEGORY_METRICS,
+    _JUDGE_NOTE,
     _METRIC_NOTES,
     _METRICS,
     _STATS_NOTE,
@@ -121,6 +122,7 @@ def _render_single(report: dict) -> tuple[str, str]:
         f"<h1>{escape(title)}</h1>\n{meta}\n"
         f"<h2>Scores</h2>\n{table}\n{by_category}"
         f"<h2>Breakdown</h2>\n<ul>{breakdown}</ul>\n<p class=\"meta\">{escape(_STATS_NOTE)}</p>"
+        f"<p class=\"meta\">{escape(_JUDGE_NOTE)}</p>"
     )
     return title, body
 

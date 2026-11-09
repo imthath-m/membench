@@ -1,0 +1,20 @@
+{"base_url": null, "item_id": "fixture-01", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-02", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-03", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-04", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-05", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-06", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-07", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-08", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-09", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-10", "judge": "fixture-x", "metric": "semantic_recall", "model": "fixture-x-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-01", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-02", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-03", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-04", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-05", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-06", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-07", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-08", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": true, "prompt_version": "1"}
+{"base_url": null, "item_id": "fixture-09", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": false, "prompt_version": "1"}
+{"base_url": null, "error": "SYNTHETIC: unparseable reply", "item_id": "fixture-10", "judge": "fixture-y", "metric": "semantic_recall", "model": "fixture-y-model", "passed": null, "prompt_version": "1"}

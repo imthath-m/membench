@@ -1,0 +1,17 @@
+# Cross-judge panel for judge validation (Phase 15): `membench judge-cross`.
+# Each judge reads its key from `api_key_env`; `base_url` selects an
+# OpenAI-compatible endpoint (omit it for Anthropic). Any OpenAI-compatible
+# host of an open-weight model works (Together, Fireworks, a local vLLM or
+# Ollama server, ...): change `base_url` / `model` / `api_key_env` together.
+judges:
+  - name: claude
+    model: claude-sonnet-5
+    api_key_env: MEMBENCH_JUDGE_API_KEY
+  - name: gpt
+    model: gpt-4.1
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+  - name: llama
+    model: meta-llama/Llama-3.3-70B-Instruct-Turbo
+    base_url: https://api.together.xyz/v1
+    api_key_env: TOGETHER_API_KEY
