@@ -9,7 +9,7 @@ from membench.core.scoring.evidence_recall import evidence_recall_at_k
 from membench.core.scoring.forget_compliance import forget_compliance
 from membench.core.scoring.judge import JudgeError, Verdict
 from membench.core.scoring.qa_accuracy import qa_accuracy
-from membench.core.scoring.staleness import staleness
+from membench.core.scoring.staleness import contains_any, staleness
 from membench.core.scoring.temporal_accuracy import temporal_accuracy
 from membench.packs.schema import parse_pack
 
@@ -60,6 +60,31 @@ def test_staleness_counts_post_update_queries_still_holding_the_stale_value():
         ("Seattle", [["b"]]),  # fresh
     ])
     assert staleness(UPDATE_PACK, traces) == 0.5
+
+
+def test_contains_any_matches_whole_words_and_phrases_only():
+    assert not contains_any(["Pro"], "Your refund was approved.")
+    assert not contains_any(["Pro"], "Products and process notes")
+    assert contains_any(["Pro"], "plan: Pro.")
+    assert contains_any(["pro"], "Switched to PRO yesterday")
+    assert contains_any(["Pro plan"], "on the pro plan now")
+    assert contains_any(["$49.99", "C++"], "costs $49.99/month")
+    assert contains_any(["C++"], "wrote it in C++, then Go")
+    assert contains_any(["v2.1"], "upgraded to v2.1.")
+    assert not contains_any(["v2.1"], "upgraded to v2.10")
+    assert not contains_any(["a.b"], "axb")  # needles are literal, not regex
+    assert not contains_any([], "anything")
+
+
+def test_staleness_ignores_a_stale_value_inside_another_word():
+    pack = parse_pack({"steps": [
+        _w("a", "plan", "I am on the Pro plan."),
+        _w("b", "plan", "I switched to Basic.", "update"),
+        _q("Plan?", expect_contains=["Basic"], expect_key="plan", expect_absent=["Pro"]),
+        _q("Plan again?", expect_contains=["Basic"], expect_key="plan", expect_absent=["Pro"]),
+    ]})
+    traces = _traces(pack, [("Basic. Refund approved.", [["b"]]), ("plan: Pro.", [["a"]])])
+    assert staleness(pack, traces) == 0.5
 
 
 def test_staleness_skips_failed_recalls_and_is_none_without_expect_absent():

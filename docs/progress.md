@@ -258,7 +258,7 @@ Status: done (with blocked items)
 
 ## Follow-up (post-Phase 16)
 Status: in progress
-- [ ] Regression test: `contains_any` must not match inside words ("Pro" vs "approved")
+- [x] Regression test: `contains_any` must not match inside words ("Pro" vs "approved")
 - [ ] `contains_any` matches whole words/phrases (case-insensitive, regex-escaped, punctuation-safe); decision documented
 - [ ] Version decision recorded (no scoring version in the manifest)
 - [ ] Regenerate fixture report (`tests/fixtures/make_report.py`)
