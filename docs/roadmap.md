@@ -17,6 +17,14 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - **CI:** installs `.[dev]` only, so `test_chroma_adapter` is skipped. No live or secret-gated jobs.
 - **Deps:** lower bounds only, no lock file.
 
+## Known issues
+
+- **Chroma `update_correctness` is unearned:** the fact key is the document id, so an update overwrites the old value. → Phase 9
+- **`forget()` is never exercised:** the runner handles `write` and `query` steps only. → Phase 9
+- **Packs are tiny, with no timestamps:** 4/7/7 queries; events default to 1 second apart. → Phase 11 (timestamps), Phase 12 (size)
+- **Missing extra prints a traceback:** the adapter is built outside the CLI's `try`, against the README and `docs/mem0.md`. → Phase 8
+- **A malformed judge reply aborts the run:** `parse_verdict` raises `ValueError`. → Phase 8
+
 ## Guiding constraints (carried over, plus additions)
 
 - Adapter budget stays under 100 lines. Shared logic (retry, timing, tokenization, flushing) lives in the runner.
@@ -37,6 +45,7 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - Per-step timeout (`--step-timeout`, default 120s).
 - Per-step error capture: a failed step is written to the trace as `error`, the run continues, and the report gains `error_rate`. A run whose `error_rate` is above a threshold is marked invalid.
 - Judge: a reply that fails to parse is retried once, then recorded as a `judge_error` instead of stopping the run.
+- Tests for the judge and the CLI: a malformed judge reply (no JSON, bad JSON) is recorded per query as `judge_error` and the other queries still score; `mem0` blocked from import gives the one-line error.
 - CI: add a `chroma` job so its adapter tests run.
 - CI: `live.yml` (manual dispatch only, secret-gated) runs `mini` against `mem0` with the judge on.
 
@@ -44,6 +53,7 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - `membench run --backend mem0` without `mem0ai` prints a one-line actionable error with exit code 1 (tested).
 - A live `mem0` + judge run of `customer-support` completes; any injected 429 is retried and logged.
 - A forced adapter exception mid-pack still produces a valid report with the error recorded.
+- A pack with one malformed judge reply still finishes; that query is recorded as `judge_error` and the rest are scored (tested).
 
 ## Phase 9 — Adapter contract v2 (breaking, bump to 0.2)
 
@@ -59,10 +69,14 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - New `forget` step type (`target: <event id(s)>`). The runner now exercises `forget()`.
 - Episodes: a pack holds one or more independent `episodes`, with `reset()` (or a fresh namespace) between them. Public datasets need this; for example, each LongMemEval question has its own haystack.
 - Test: every file in `membench/adapters/` is under 100 lines.
+- Pack test for backend-side update resolution: an `update` write has a new `Event.id` and different wording from the stale fact, so only the backend can decide which is current. Assert that the adapter receives distinct ids and that Chroma's context holds both values.
+- Runner test: a `forget` step calls `adapter.forget` with the target ids (recording fake adapter), and is traced with its latency.
 
 **Done when**
 - All 3 adapters are ported, each still under 100 lines; the contract is documented in the README.
 - Chroma no longer scores 1.0 on `update_correctness` by construction (regression test).
+- The update-resolution pack test passes on all 3 adapters, and no adapter receives a `fact_key`.
+- The runner test shows `forget` steps reach `adapter.forget`.
 - A pack with a `forget` step and two episodes runs on all 3 adapters.
 
 ## Phase 10 — Reproducibility + cost accounting
@@ -99,6 +113,7 @@ v0.1 (plan.md Phases 1–7) is a working harness. It is not yet a benchmark: pac
 - **Latency:** separate `write`, `ingest` and `recall` p50/p95. p95 is marked `n/a` below 100 samples.
 - **Cost:** ingest tokens per 1k writes and USD per 1k queries.
 - Per-category breakdown in the md/html reports.
+- Test: every `write` and `query` in the bundled packs sets an explicit `timestamp`; none relies on the 1-second default.
 
 **Done when**
 - Every PRD metric (recall accuracy, contradiction handling, temporal reasoning, staleness, latency, tokens per recall) appears in the JSON report.
