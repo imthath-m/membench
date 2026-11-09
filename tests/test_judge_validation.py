@@ -324,7 +324,7 @@ def test_cli_judge_sample(tmp_path):
     sample = [json.loads(x) for x in sample_path.read_text().splitlines()]
     assert sum(i["metric"] == "semantic_recall" for i in sample) == 144
     assert sum(i["metric"] == "contradiction_rate" for i in sample) == 36
-    assert "fewer than 200" in result.output
+    assert "fewer than 200" in result.output and "no qa_accuracy items" in result.output
 
 
 # --- cross-judge -------------------------------------------------------------------------
@@ -472,3 +472,12 @@ def test_judge_prompt_is_pinned_to_its_version():
         "judge prompt changed: bump JUDGE_PROMPT_VERSION and follow the prompt-versioning "
         "policy in docs/judge-validation.md"
     )
+
+
+def test_committed_sample_has_200_items_per_offline_judge_metric():
+    sample = [json.loads(x) for x in (REPO / "validation/sample.jsonl").read_text().splitlines()]
+    assert len({i["id"] for i in sample}) == len(sample)
+    for metric in ("semantic_recall", "contradiction_rate"):
+        items = [i for i in sample if i["metric"] == metric]
+        assert len(items) == 200
+        assert {i["backend"] for i in items} == {"full-context", "bm25", "chroma"}

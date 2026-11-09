@@ -35,6 +35,7 @@ from membench.core.scoring.judge import (
 )
 from membench.core.stats import summarize_repeats
 from membench.core.tokens import default_tokenizer
+from membench.core.validation import JUDGE_METRICS
 from membench.core.validation.agreement import agreement_report, render_agreement_markdown
 from membench.core.validation.cross import (
     build_panel_judge,
@@ -570,10 +571,15 @@ def judge_sample(
     sample = stratified_sample(items, n, seed)
     write_jsonl(out, sample)
     typer.echo(f"Wrote {len(sample)} items from {len(items)} judge calls to {out}")
-    for metric, strata in sample_summary(sample).items():
+    summary = sample_summary(sample)
+    for metric, strata in summary.items():
         typer.echo(f"  {metric}: {sum(strata.values())} items, {len(strata)} strata")
         if sum(strata.values()) < n:
             typer.echo(f"  Warning: {metric} has fewer than {n} distinct items", err=True)
+    for metric in JUDGE_METRICS:
+        if not any(m.split(":")[0] == metric for m in summary):
+            typer.echo(f"  Warning: no {metric} items (qa_accuracy needs a run with "
+                       "--reader-model)", err=True)
 
 
 @app.command(name="judge-labels")
