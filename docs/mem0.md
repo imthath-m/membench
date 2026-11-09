@@ -15,7 +15,8 @@ membench run --backend mem0 --pack customer-support --out report.json
 Config is read from `--backend-config <file>` (a JSON or YAML mapping) and
 passed to `Mem0Adapter`. It supports:
 
-- `user_id` — Mem0 user/session scope (default: `"membench"`).
+- `user_id` — Mem0 user/session scope (default: `namespace`, i.e.
+  `"membench"`, or `"membench-r<i>"` for repeat i of `--repeats`).
 - `top_k` — number of memories returned per `recall()` (default: `3`).
 - `mem0_config` — optional dict forwarded to `Memory.from_config(...)`
   (vector store / LLM / embedder settings); omit to use Mem0's defaults.
