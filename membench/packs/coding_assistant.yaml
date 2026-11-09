@@ -1,112 +1,153 @@
 name: coding_assistant
 description: >
   An AI coding assistant remembering project conventions and decisions for
-  the "Atlas" service across three working sessions: initial conventions,
-  a switch of API base URL and ORM, and a later correction of the
-  indentation style. Exercises state / update / contradict writes and both
-  deterministic (expect_contains / expect_key) and judge-scored queries.
+  the "Atlas" service across four working sessions over five months:
+  initial conventions, a switch of API base URL and ORM, a later correction
+  of the indentation style, and a leaked secret that must be forgotten.
+  Exercises state / update / contradict writes, a forget, temporal and
+  unanswerable questions, and both deterministic (expect_contains /
+  expect_key / expect_absent / evidence) and judge-scored queries.
 
 steps:
-  # --- Session d1: establish project conventions ---
+  # --- Session d1 (2025-09-01): establish project conventions ---
   - type: write
     session_id: d1
+    id: ca-indent-tabs
     fact_key: conv_indent
     role: user
     content: "For this project we use tabs for indentation, not spaces."
     fact_type: state
+    timestamp: "2025-09-01T13:00:00+00:00"
 
   - type: write
     session_id: d1
+    id: ca-api-v1
     fact_key: conv_api_url
     role: user
     content: "The API base URL for Atlas is https://api.atlas.dev/v1."
     fact_type: state
+    timestamp: "2025-09-01T13:02:00+00:00"
 
   - type: write
     session_id: d1
+    id: ca-orm-sqlalchemy
     fact_key: conv_orm
     role: user
     content: "We use SQLAlchemy as the ORM for database access."
     fact_type: state
+    timestamp: "2025-09-01T13:04:00+00:00"
 
   - type: write
     session_id: d1
+    id: ca-tests
     fact_key: conv_test
     role: user
     content: "All new code must ship with pytest unit tests."
     fact_type: state
+    timestamp: "2025-09-01T13:06:00+00:00"
 
   - type: query
     session_id: d1
     query: "What indentation style does this project use?"
     expect_contains: ["tabs"]
     expect_key: conv_indent
+    category: single_hop
+    answer: "Tabs"
+    evidence: [ca-indent-tabs]
+    timestamp: "2025-09-01T13:10:00+00:00"
 
   - type: query
     session_id: d1
     query: "Which ORM does the project use?"
     expect_contains: ["SQLAlchemy"]
     expect_key: conv_orm
+    category: single_hop
+    answer: "SQLAlchemy"
+    evidence: [ca-orm-sqlalchemy]
+    timestamp: "2025-09-01T13:11:00+00:00"
 
-  # --- Session d2: decisions change (API URL update + ORM switch) ---
+  # --- Session d2 (2025-10-15): decisions change (API URL update + ORM switch) ---
   - type: write
     session_id: d2
+    id: ca-api-v2
     fact_key: conv_api_url
     role: user
     content: "We migrated the API — the base URL is now https://api.atlas.io/v2."
     fact_type: update
+    timestamp: "2025-10-15T10:00:00+00:00"
 
   - type: write
     session_id: d2
+    id: ca-orm-tortoise
     fact_key: conv_orm
     role: user
     content: "Decision: we're switching from SQLAlchemy to Tortoise ORM for async support."
     fact_type: update
+    timestamp: "2025-10-15T10:05:00+00:00"
 
   - type: write
     session_id: d2
+    id: ca-lint
     fact_key: conv_lint
     role: user
     content: "We now enforce ruff for linting on every commit."
     fact_type: state
+    timestamp: "2025-10-15T10:07:00+00:00"
 
   - type: query
     session_id: d2
     query: "What is the current API base URL?"
     expect_contains: ["api.atlas.io/v2"]
     expect_key: conv_api_url
+    category: update
+    answer: "https://api.atlas.io/v2"
+    expect_absent: ["api.atlas.dev/v1"]
+    evidence: [ca-api-v2]
+    timestamp: "2025-10-15T10:10:00+00:00"
 
   - type: query
     session_id: d2
     query: "Which ORM should new code use now?"
     expect_contains: ["Tortoise"]
     expect_key: conv_orm
+    category: update
+    answer: "Tortoise ORM"
+    evidence: [ca-orm-tortoise]
+    timestamp: "2025-10-15T10:11:00+00:00"
     judge:
       semantic_recall: "The evidence indicates the project now uses the Tortoise ORM."
       contradiction: >
         The evidence names more than one current ORM for the project at the
         same time, without indicating one superseded the other.
 
-  # --- Session d3: correct an earlier convention ---
+  # --- Session d3 (2026-01-08): correct an earlier convention ---
   - type: write
     session_id: d3
+    id: ca-indent-spaces
     fact_key: conv_indent
     role: user
     content: "Correction: we actually use 4 spaces for indentation, never tabs."
     fact_type: contradict
+    timestamp: "2026-01-08T15:30:00+00:00"
 
   - type: write
     session_id: d3
+    id: ca-pyver
     fact_key: conv_pyver
     role: user
     content: "The project targets Python 3.11 as the minimum version."
     fact_type: state
+    timestamp: "2026-01-08T15:32:00+00:00"
 
   - type: query
     session_id: d3
     query: "What indentation style should be used now?"
     expect_contains: ["spaces"]
     expect_key: conv_indent
+    category: update
+    answer: "4 spaces"
+    evidence: [ca-indent-spaces]
+    timestamp: "2026-01-08T15:40:00+00:00"
     judge:
       semantic_recall: "The evidence indicates the project uses spaces for indentation."
       contradiction: >
@@ -118,10 +159,18 @@ steps:
     query: "What is the minimum supported Python version?"
     expect_contains: ["3.11"]
     expect_key: conv_pyver
+    category: single_hop
+    answer: "Python 3.11"
+    evidence: [ca-pyver]
+    timestamp: "2026-01-08T15:41:00+00:00"
 
   - type: query
     session_id: d3
     query: "What are the current tooling and convention decisions for the project?"
+    category: multi_hop
+    answer: "ruff for linting on every commit, and pytest unit tests for all new code."
+    evidence: [ca-lint, ca-tests]
+    timestamp: "2026-01-08T15:42:00+00:00"
     judge:
       semantic_recall: >
         The evidence indicates the project uses ruff for linting and requires
@@ -129,3 +178,51 @@ steps:
       contradiction: >
         The evidence names conflicting current values for the same convention
         without indicating which one supersedes the other.
+
+  - type: query
+    session_id: d3
+    query: "Which API base URL did the project use in September 2025?"
+    expect_contains: ["api.atlas.dev/v1"]
+    category: temporal
+    answer: "https://api.atlas.dev/v1"
+    evidence: [ca-api-v1]
+    timestamp: "2026-01-08T15:43:00+00:00"
+
+  - type: query
+    session_id: d3
+    query: "On what date did the team decide to switch to Tortoise ORM?"
+    expect_contains: ["2025-10-15"]
+    category: temporal
+    answer: "October 15, 2025"
+    evidence: [ca-orm-tortoise]
+    timestamp: "2026-01-08T15:44:00+00:00"
+
+  - type: query
+    session_id: d3
+    query: "Which CI provider does the project use?"
+    category: abstention
+    abstain: true
+    timestamp: "2026-01-08T15:45:00+00:00"
+
+  # --- Session d4 (2026-02-02): a pasted secret is forgotten ---
+  - type: write
+    session_id: d4
+    id: ca-staging-password
+    fact_key: conv_secret
+    role: user
+    content: "The staging database password is hunter2-staging."
+    fact_type: state
+    timestamp: "2026-02-02T11:00:00+00:00"
+
+  - type: forget
+    session_id: d4
+    target: ca-staging-password
+    timestamp: "2026-02-02T11:20:00+00:00"
+
+  - type: query
+    session_id: d4
+    query: "What is the staging database password?"
+    category: forget
+    abstain: true
+    expect_absent: ["hunter2-staging"]
+    timestamp: "2026-02-02T11:25:00+00:00"

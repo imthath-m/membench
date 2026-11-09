@@ -1,16 +1,16 @@
 {
   "pack_name": "customer_support",
   "backend_name": "full-context",
-  "started_at": "2026-11-09T03:59:14.821027+00:00",
-  "finished_at": "2026-11-09T03:59:14.825802+00:00",
+  "started_at": "2026-11-09T04:13:47.783310+00:00",
+  "finished_at": "2026-11-09T04:13:47.789037+00:00",
   "traces": [
     {
       "step_index": 0,
       "step_type": "write",
       "session_id": "t1",
-      "latency_ms": 0.5267799999728595,
+      "latency_ms": 0.4549219997898035,
       "detail": {
-        "event_id": "evt-0",
+        "event_id": "cs-name",
         "fact_key": "fact_name",
         "fact_type": "state",
         "retries": 0
@@ -22,9 +22,9 @@
       "step_index": 1,
       "step_type": "write",
       "session_id": "t1",
-      "latency_ms": 0.30232599988266884,
+      "latency_ms": 0.3319770003145095,
       "detail": {
-        "event_id": "evt-1",
+        "event_id": "cs-email",
         "fact_key": "fact_email",
         "fact_type": "state",
         "retries": 0
@@ -36,9 +36,9 @@
       "step_index": 2,
       "step_type": "write",
       "session_id": "t1",
-      "latency_ms": 0.3278900001078,
+      "latency_ms": 0.27140099973621545,
       "detail": {
-        "event_id": "evt-2",
+        "event_id": "cs-plan-basic",
         "fact_key": "fact_plan",
         "fact_type": "state",
         "retries": 0
@@ -50,9 +50,9 @@
       "step_index": 3,
       "step_type": "write",
       "session_id": "t1",
-      "latency_ms": 0.24533399982828996,
+      "latency_ms": 0.1917729996421258,
       "detail": {
-        "event_id": "evt-3",
+        "event_id": "cs-order-4471",
         "fact_key": "fact_order",
         "fact_type": "state",
         "retries": 0
@@ -64,47 +64,49 @@
       "step_index": 4,
       "step_type": "query",
       "session_id": "t1",
-      "latency_ms": 0.1966749998700834,
+      "latency_ms": 0.25434899998799665,
       "detail": {
         "query": "What is the customer's name?",
-        "context": "[user] Hi, my name is Dana Whitfield.\n[user] You can reach me at dana.whitfield@example.com.\n[user] I'm currently on the Basic plan.\n[user] I'm calling about order number ORD-4471.",
-        "token_count": 28,
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.",
+        "token_count": 32,
         "items": [
           {
             "event_ids": [
-              "evt-0"
+              "cs-name"
             ],
             "text": "Hi, my name is Dana Whitfield.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-1"
+              "cs-email"
             ],
             "text": "You can reach me at dana.whitfield@example.com.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-2"
+              "cs-plan-basic"
             ],
             "text": "I'm currently on the Basic plan.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-3"
+              "cs-order-4471"
             ],
             "text": "I'm calling about order number ORD-4471.",
             "score": null
           }
         ],
-        "ingest_latency_ms": 0.17694100006337976,
+        "ingest_latency_ms": 0.15713199991296278,
         "expect_contains": [
           "Dana"
         ],
         "expect_key": "fact_name",
-        "retries": 0
+        "category": "single_hop",
+        "retries": 0,
+        "reader_answer": "[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471."
       },
       "error": null,
       "episode": 0
@@ -113,36 +115,36 @@
       "step_index": 5,
       "step_type": "query",
       "session_id": "t1",
-      "latency_ms": 0.2019790001668298,
+      "latency_ms": 0.1944239998010744,
       "detail": {
         "query": "Which subscription plan is the customer on?",
-        "context": "[user] Hi, my name is Dana Whitfield.\n[user] You can reach me at dana.whitfield@example.com.\n[user] I'm currently on the Basic plan.\n[user] I'm calling about order number ORD-4471.",
-        "token_count": 28,
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.",
+        "token_count": 32,
         "items": [
           {
             "event_ids": [
-              "evt-0"
+              "cs-name"
             ],
             "text": "Hi, my name is Dana Whitfield.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-1"
+              "cs-email"
             ],
             "text": "You can reach me at dana.whitfield@example.com.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-2"
+              "cs-plan-basic"
             ],
             "text": "I'm currently on the Basic plan.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-3"
+              "cs-order-4471"
             ],
             "text": "I'm calling about order number ORD-4471.",
             "score": null
@@ -153,7 +155,9 @@
           "Basic"
         ],
         "expect_key": "fact_plan",
-        "retries": 0
+        "category": "single_hop",
+        "retries": 0,
+        "reader_answer": "[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471."
       },
       "error": null,
       "episode": 0
@@ -162,9 +166,9 @@
       "step_index": 6,
       "step_type": "write",
       "session_id": "t2",
-      "latency_ms": 0.20293400007176388,
+      "latency_ms": 0.16245999995589955,
       "detail": {
-        "event_id": "evt-6",
+        "event_id": "cs-plan-pro",
         "fact_key": "fact_plan",
         "fact_type": "update",
         "retries": 0
@@ -176,9 +180,9 @@
       "step_index": 7,
       "step_type": "write",
       "session_id": "t2",
-      "latency_ms": 0.18733900014922256,
+      "latency_ms": 0.12570500030051335,
       "detail": {
-        "event_id": "evt-7",
+        "event_id": "cs-address-elm",
         "fact_key": "fact_address",
         "fact_type": "state",
         "retries": 0
@@ -190,9 +194,9 @@
       "step_index": 8,
       "step_type": "write",
       "session_id": "t2",
-      "latency_ms": 0.12109699991924572,
+      "latency_ms": 0.10369300025558914,
       "detail": {
-        "event_id": "evt-8",
+        "event_id": "cs-order-7788",
         "fact_key": "fact_order",
         "fact_type": "contradict",
         "retries": 0
@@ -204,68 +208,70 @@
       "step_index": 9,
       "step_type": "query",
       "session_id": "t2",
-      "latency_ms": 0.15427000016643433,
+      "latency_ms": 0.17133900018961867,
       "detail": {
         "query": "Which subscription plan is the customer on now?",
-        "context": "[user] Hi, my name is Dana Whitfield.\n[user] You can reach me at dana.whitfield@example.com.\n[user] I'm currently on the Basic plan.\n[user] I'm calling about order number ORD-4471.\n[user] I'd like to upgrade to the Pro plan, effective today.\n[user] Please ship to 22 Elm Street, Portland, OR 97201.\n[user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
-        "token_count": 64,
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
+        "token_count": 71,
         "items": [
           {
             "event_ids": [
-              "evt-0"
+              "cs-name"
             ],
             "text": "Hi, my name is Dana Whitfield.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-1"
+              "cs-email"
             ],
             "text": "You can reach me at dana.whitfield@example.com.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-2"
+              "cs-plan-basic"
             ],
             "text": "I'm currently on the Basic plan.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-3"
+              "cs-order-4471"
             ],
             "text": "I'm calling about order number ORD-4471.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-6"
+              "cs-plan-pro"
             ],
             "text": "I'd like to upgrade to the Pro plan, effective today.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-7"
+              "cs-address-elm"
             ],
             "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-8"
+              "cs-order-7788"
             ],
             "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
             "score": null
           }
         ],
-        "ingest_latency_ms": 0.15067699996507145,
+        "ingest_latency_ms": 0.12170199988759123,
         "expect_contains": [
           "Pro"
         ],
         "expect_key": "fact_plan",
-        "retries": 0
+        "category": "update",
+        "retries": 0,
+        "reader_answer": "[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471."
       },
       "error": null,
       "episode": 0
@@ -274,57 +280,57 @@
       "step_index": 10,
       "step_type": "query",
       "session_id": "t2",
-      "latency_ms": 0.23491799993280438,
+      "latency_ms": 0.19700599978023092,
       "detail": {
         "query": "What is the customer's correct order number?",
-        "context": "[user] Hi, my name is Dana Whitfield.\n[user] You can reach me at dana.whitfield@example.com.\n[user] I'm currently on the Basic plan.\n[user] I'm calling about order number ORD-4471.\n[user] I'd like to upgrade to the Pro plan, effective today.\n[user] Please ship to 22 Elm Street, Portland, OR 97201.\n[user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
-        "token_count": 64,
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
+        "token_count": 71,
         "items": [
           {
             "event_ids": [
-              "evt-0"
+              "cs-name"
             ],
             "text": "Hi, my name is Dana Whitfield.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-1"
+              "cs-email"
             ],
             "text": "You can reach me at dana.whitfield@example.com.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-2"
+              "cs-plan-basic"
             ],
             "text": "I'm currently on the Basic plan.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-3"
+              "cs-order-4471"
             ],
             "text": "I'm calling about order number ORD-4471.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-6"
+              "cs-plan-pro"
             ],
             "text": "I'd like to upgrade to the Pro plan, effective today.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-7"
+              "cs-address-elm"
             ],
             "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-8"
+              "cs-order-7788"
             ],
             "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
             "score": null
@@ -335,7 +341,9 @@
           "ORD-7788"
         ],
         "expect_key": "fact_order",
-        "retries": 0
+        "category": "update",
+        "retries": 0,
+        "reader_answer": "[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471."
       },
       "error": null,
       "episode": 0
@@ -344,9 +352,9 @@
       "step_index": 11,
       "step_type": "write",
       "session_id": "t3",
-      "latency_ms": 0.157566999860137,
+      "latency_ms": 0.11271800030954182,
       "detail": {
-        "event_id": "evt-11",
+        "event_id": "cs-pref-email",
         "fact_key": "fact_pref",
         "fact_type": "state",
         "retries": 0
@@ -358,9 +366,9 @@
       "step_index": 12,
       "step_type": "write",
       "session_id": "t3",
-      "latency_ms": 0.2342840000437718,
+      "latency_ms": 0.10280899959980161,
       "detail": {
-        "event_id": "evt-12",
+        "event_id": "cs-address-oak",
         "fact_key": "fact_address",
         "fact_type": "update",
         "retries": 0
@@ -372,83 +380,85 @@
       "step_index": 13,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.12037399983455543,
+      "latency_ms": 0.11807800001406576,
       "detail": {
         "query": "What is the customer's current shipping address?",
-        "context": "[user] Hi, my name is Dana Whitfield.\n[user] You can reach me at dana.whitfield@example.com.\n[user] I'm currently on the Basic plan.\n[user] I'm calling about order number ORD-4471.\n[user] I'd like to upgrade to the Pro plan, effective today.\n[user] Please ship to 22 Elm Street, Portland, OR 97201.\n[user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[user] Going forward I prefer to be contacted by email rather than phone.\n[user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
-        "token_count": 91,
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+        "token_count": 100,
         "items": [
           {
             "event_ids": [
-              "evt-0"
+              "cs-name"
             ],
             "text": "Hi, my name is Dana Whitfield.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-1"
+              "cs-email"
             ],
             "text": "You can reach me at dana.whitfield@example.com.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-2"
+              "cs-plan-basic"
             ],
             "text": "I'm currently on the Basic plan.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-3"
+              "cs-order-4471"
             ],
             "text": "I'm calling about order number ORD-4471.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-6"
+              "cs-plan-pro"
             ],
             "text": "I'd like to upgrade to the Pro plan, effective today.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-7"
+              "cs-address-elm"
             ],
             "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-8"
+              "cs-order-7788"
             ],
             "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-11"
+              "cs-pref-email"
             ],
             "text": "Going forward I prefer to be contacted by email rather than phone.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-12"
+              "cs-address-oak"
             ],
             "text": "I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
             "score": null
           }
         ],
-        "ingest_latency_ms": 0.1666880000357196,
+        "ingest_latency_ms": 0.11927700006708619,
         "expect_contains": [
           "Oak Avenue",
           "Seattle"
         ],
         "expect_key": "fact_address",
-        "retries": 0
+        "category": "update",
+        "retries": 0,
+        "reader_answer": "[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101."
       },
       "error": null,
       "episode": 0
@@ -457,71 +467,71 @@
       "step_index": 14,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.151361000007455,
+      "latency_ms": 0.13318900028025382,
       "detail": {
         "query": "How does the customer prefer to be contacted?",
-        "context": "[user] Hi, my name is Dana Whitfield.\n[user] You can reach me at dana.whitfield@example.com.\n[user] I'm currently on the Basic plan.\n[user] I'm calling about order number ORD-4471.\n[user] I'd like to upgrade to the Pro plan, effective today.\n[user] Please ship to 22 Elm Street, Portland, OR 97201.\n[user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[user] Going forward I prefer to be contacted by email rather than phone.\n[user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
-        "token_count": 91,
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+        "token_count": 100,
         "items": [
           {
             "event_ids": [
-              "evt-0"
+              "cs-name"
             ],
             "text": "Hi, my name is Dana Whitfield.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-1"
+              "cs-email"
             ],
             "text": "You can reach me at dana.whitfield@example.com.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-2"
+              "cs-plan-basic"
             ],
             "text": "I'm currently on the Basic plan.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-3"
+              "cs-order-4471"
             ],
             "text": "I'm calling about order number ORD-4471.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-6"
+              "cs-plan-pro"
             ],
             "text": "I'd like to upgrade to the Pro plan, effective today.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-7"
+              "cs-address-elm"
             ],
             "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-8"
+              "cs-order-7788"
             ],
             "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-11"
+              "cs-pref-email"
             ],
             "text": "Going forward I prefer to be contacted by email rather than phone.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-12"
+              "cs-address-oak"
             ],
             "text": "I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
             "score": null
@@ -532,7 +542,9 @@
           "email"
         ],
         "expect_key": "fact_pref",
-        "retries": 0
+        "category": "single_hop",
+        "retries": 0,
+        "reader_answer": "[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101."
       },
       "error": null,
       "episode": 0
@@ -541,71 +553,71 @@
       "step_index": 15,
       "step_type": "query",
       "session_id": "t3",
-      "latency_ms": 0.10805700003402308,
+      "latency_ms": 0.12852300005761208,
       "detail": {
         "query": "Summarize the customer's plan history.",
-        "context": "[user] Hi, my name is Dana Whitfield.\n[user] You can reach me at dana.whitfield@example.com.\n[user] I'm currently on the Basic plan.\n[user] I'm calling about order number ORD-4471.\n[user] I'd like to upgrade to the Pro plan, effective today.\n[user] Please ship to 22 Elm Street, Portland, OR 97201.\n[user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[user] Going forward I prefer to be contacted by email rather than phone.\n[user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
-        "token_count": 91,
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+        "token_count": 100,
         "items": [
           {
             "event_ids": [
-              "evt-0"
+              "cs-name"
             ],
             "text": "Hi, my name is Dana Whitfield.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-1"
+              "cs-email"
             ],
             "text": "You can reach me at dana.whitfield@example.com.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-2"
+              "cs-plan-basic"
             ],
             "text": "I'm currently on the Basic plan.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-3"
+              "cs-order-4471"
             ],
             "text": "I'm calling about order number ORD-4471.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-6"
+              "cs-plan-pro"
             ],
             "text": "I'd like to upgrade to the Pro plan, effective today.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-7"
+              "cs-address-elm"
             ],
             "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-8"
+              "cs-order-7788"
             ],
             "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-11"
+              "cs-pref-email"
             ],
             "text": "Going forward I prefer to be contacted by email rather than phone.",
             "score": null
           },
           {
             "event_ids": [
-              "evt-12"
+              "cs-address-oak"
             ],
             "text": "I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
             "score": null
@@ -614,7 +626,377 @@
         "ingest_latency_ms": null,
         "expect_contains": [],
         "expect_key": null,
+        "category": "multi_hop",
+        "retries": 0,
+        "reader_answer": "[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101."
+      },
+      "error": null,
+      "episode": 0
+    },
+    {
+      "step_index": 16,
+      "step_type": "query",
+      "session_id": "t3",
+      "latency_ms": 0.12017200015179696,
+      "detail": {
+        "query": "Which plan was the customer on in early February 2025?",
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+        "token_count": 100,
+        "items": [
+          {
+            "event_ids": [
+              "cs-name"
+            ],
+            "text": "Hi, my name is Dana Whitfield.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-email"
+            ],
+            "text": "You can reach me at dana.whitfield@example.com.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-plan-basic"
+            ],
+            "text": "I'm currently on the Basic plan.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-order-4471"
+            ],
+            "text": "I'm calling about order number ORD-4471.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-plan-pro"
+            ],
+            "text": "I'd like to upgrade to the Pro plan, effective today.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-address-elm"
+            ],
+            "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-order-7788"
+            ],
+            "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-pref-email"
+            ],
+            "text": "Going forward I prefer to be contacted by email rather than phone.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-address-oak"
+            ],
+            "text": "I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+            "score": null
+          }
+        ],
+        "ingest_latency_ms": null,
+        "expect_contains": [
+          "Basic"
+        ],
+        "expect_key": null,
+        "category": "temporal",
+        "retries": 0,
+        "reader_answer": "[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101."
+      },
+      "error": null,
+      "episode": 0
+    },
+    {
+      "step_index": 17,
+      "step_type": "query",
+      "session_id": "t3",
+      "latency_ms": 0.12340800003585173,
+      "detail": {
+        "query": "On what date did the customer upgrade to the Pro plan?",
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+        "token_count": 100,
+        "items": [
+          {
+            "event_ids": [
+              "cs-name"
+            ],
+            "text": "Hi, my name is Dana Whitfield.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-email"
+            ],
+            "text": "You can reach me at dana.whitfield@example.com.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-plan-basic"
+            ],
+            "text": "I'm currently on the Basic plan.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-order-4471"
+            ],
+            "text": "I'm calling about order number ORD-4471.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-plan-pro"
+            ],
+            "text": "I'd like to upgrade to the Pro plan, effective today.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-address-elm"
+            ],
+            "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-order-7788"
+            ],
+            "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-pref-email"
+            ],
+            "text": "Going forward I prefer to be contacted by email rather than phone.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-address-oak"
+            ],
+            "text": "I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+            "score": null
+          }
+        ],
+        "ingest_latency_ms": null,
+        "expect_contains": [
+          "2025-02-20"
+        ],
+        "expect_key": null,
+        "category": "temporal",
+        "retries": 0,
+        "reader_answer": "[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101."
+      },
+      "error": null,
+      "episode": 0
+    },
+    {
+      "step_index": 18,
+      "step_type": "query",
+      "session_id": "t3",
+      "latency_ms": 0.1432310000382131,
+      "detail": {
+        "query": "What is the customer's phone number?",
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:03:00+00:00] [user] You can reach me at dana.whitfield@example.com.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+        "token_count": 100,
+        "items": [
+          {
+            "event_ids": [
+              "cs-name"
+            ],
+            "text": "Hi, my name is Dana Whitfield.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-email"
+            ],
+            "text": "You can reach me at dana.whitfield@example.com.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-plan-basic"
+            ],
+            "text": "I'm currently on the Basic plan.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-order-4471"
+            ],
+            "text": "I'm calling about order number ORD-4471.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-plan-pro"
+            ],
+            "text": "I'd like to upgrade to the Pro plan, effective today.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-address-elm"
+            ],
+            "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-order-7788"
+            ],
+            "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-pref-email"
+            ],
+            "text": "Going forward I prefer to be contacted by email rather than phone.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-address-oak"
+            ],
+            "text": "I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+            "score": null
+          }
+        ],
+        "ingest_latency_ms": null,
+        "expect_contains": [],
+        "expect_key": null,
+        "category": "abstention",
+        "retries": 0,
+        "reader_answer": "I don't know"
+      },
+      "error": null,
+      "episode": 0
+    },
+    {
+      "step_index": 19,
+      "step_type": "write",
+      "session_id": "t4",
+      "latency_ms": 0.10416300028737169,
+      "detail": {
+        "event_id": "cs-erase-request",
+        "fact_key": "fact_erase",
+        "fact_type": "state",
         "retries": 0
+      },
+      "error": null,
+      "episode": 0
+    },
+    {
+      "step_index": 20,
+      "step_type": "forget",
+      "session_id": "t4",
+      "latency_ms": 0.16319799988195882,
+      "detail": {
+        "target": [
+          "cs-email"
+        ],
+        "retries": 0
+      },
+      "error": null,
+      "episode": 0
+    },
+    {
+      "step_index": 21,
+      "step_type": "query",
+      "session_id": "t4",
+      "latency_ms": 0.12051900012011174,
+      "detail": {
+        "query": "What is the customer's email address?",
+        "context": "[2025-01-14T10:02:00+00:00] [user] Hi, my name is Dana Whitfield.\n[2025-01-14T10:04:00+00:00] [user] I'm currently on the Basic plan.\n[2025-01-14T10:05:00+00:00] [user] I'm calling about order number ORD-4471.\n[2025-02-20T14:30:00+00:00] [user] I'd like to upgrade to the Pro plan, effective today.\n[2025-02-20T14:31:00+00:00] [user] Please ship to 22 Elm Street, Portland, OR 97201.\n[2025-02-20T14:32:00+00:00] [user] Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.\n[2025-04-03T09:15:00+00:00] [user] Going forward I prefer to be contacted by email rather than phone.\n[2025-04-03T09:16:00+00:00] [user] I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.\n[2025-06-18T16:00:00+00:00] [user] Please delete my email address from your records.",
+        "token_count": 102,
+        "items": [
+          {
+            "event_ids": [
+              "cs-name"
+            ],
+            "text": "Hi, my name is Dana Whitfield.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-plan-basic"
+            ],
+            "text": "I'm currently on the Basic plan.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-order-4471"
+            ],
+            "text": "I'm calling about order number ORD-4471.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-plan-pro"
+            ],
+            "text": "I'd like to upgrade to the Pro plan, effective today.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-address-elm"
+            ],
+            "text": "Please ship to 22 Elm Street, Portland, OR 97201.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-order-7788"
+            ],
+            "text": "Actually I gave the wrong number earlier \u2014 my order is ORD-7788, not ORD-4471.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-pref-email"
+            ],
+            "text": "Going forward I prefer to be contacted by email rather than phone.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-address-oak"
+            ],
+            "text": "I've moved \u2014 please update shipping to 90 Oak Avenue, Seattle, WA 98101.",
+            "score": null
+          },
+          {
+            "event_ids": [
+              "cs-erase-request"
+            ],
+            "text": "Please delete my email address from your records.",
+            "score": null
+          }
+        ],
+        "ingest_latency_ms": 0.11772499965445604,
+        "expect_contains": [],
+        "expect_key": null,
+        "category": "forget",
+        "retries": 0,
+        "reader_answer": "[2025-06-18T16:00:00+00:00] [user] Please delete my email address from your records."
       },
       "error": null,
       "episode": 0
@@ -623,19 +1005,74 @@
   "scores": {
     "recall_precision": 1.0,
     "update_correctness": 1.0,
-    "token_cost": 65.28571428571429,
-    "p95_latency_ms": 0.5267799999728595,
+    "staleness": 1.0,
+    "temporal_accuracy": 1.0,
+    "forget_compliance": 1.0,
+    "evidence_recall_at_k": 1.0,
+    "abstention": 0.5,
     "semantic_recall": 1.0,
     "contradiction_rate": 1.0,
+    "qa_accuracy": 1.0,
+    "token_cost": 82.54545454545455,
+    "write_p50_ms": 0.12570500030051335,
+    "write_p95_ms": null,
+    "ingest_p50_ms": 0.11927700006708619,
+    "ingest_p95_ms": null,
+    "recall_p50_ms": 0.13318900028025382,
+    "recall_p95_ms": null,
     "error_rate": 0.0
   },
   "usage": null,
+  "by_category": {
+    "abstention": {
+      "n": 1,
+      "recall_precision": null,
+      "evidence_recall_at_k": null,
+      "semantic_recall": null,
+      "qa_accuracy": null
+    },
+    "forget": {
+      "n": 1,
+      "recall_precision": null,
+      "evidence_recall_at_k": null,
+      "semantic_recall": null,
+      "qa_accuracy": null
+    },
+    "multi_hop": {
+      "n": 1,
+      "recall_precision": null,
+      "evidence_recall_at_k": 1.0,
+      "semantic_recall": 1.0,
+      "qa_accuracy": 1.0
+    },
+    "single_hop": {
+      "n": 3,
+      "recall_precision": 1.0,
+      "evidence_recall_at_k": 1.0,
+      "semantic_recall": null,
+      "qa_accuracy": 1.0
+    },
+    "temporal": {
+      "n": 2,
+      "recall_precision": 1.0,
+      "evidence_recall_at_k": 1.0,
+      "semantic_recall": null,
+      "qa_accuracy": 1.0
+    },
+    "update": {
+      "n": 3,
+      "recall_precision": 1.0,
+      "evidence_recall_at_k": 1.0,
+      "semantic_recall": 1.0,
+      "qa_accuracy": 1.0
+    }
+  },
   "valid": true,
   "manifest": {
-    "schema_version": "1",
+    "schema_version": "2",
     "membench": {
       "version": "0.2.0",
-      "git_commit": "9274b738ab2c925ce46dad24cab87e7ce4edb73b",
+      "git_commit": "0b608b2fc447402373f443261dd0215e18933597",
       "git_dirty": true
     },
     "python": "3.13.18",
@@ -650,7 +1087,7 @@
     },
     "pack": {
       "name": "customer_support",
-      "sha256": "79e36d50b15aac0f50905d510260b6dc146b8d791719ad78697fcd3dcc7a9b95"
+      "sha256": "de056826da97ef25885f6e06345da2a6e2cdb58c67c297e8285e6ba0e0fe21f5"
     },
     "dataset": null,
     "judge": {
@@ -658,26 +1095,37 @@
       "base_url": "https://api.anthropic.com",
       "prompt_version": "1"
     },
-    "reader": null,
-    "tokenizer": "membench.core.tokens.count_tokens",
+    "reader": {
+      "model": "claude-haiku-4-5",
+      "base_url": "https://api.anthropic.com",
+      "prompt_version": "1"
+    },
+    "tokenizer": "whitespace:approx",
     "seed": 0,
     "repeat": 0,
-    "started_at": "2026-11-09T03:59:14.821027+00:00",
-    "finished_at": "2026-11-09T03:59:14.825802+00:00"
+    "started_at": "2026-11-09T04:13:47.783310+00:00",
+    "finished_at": "2026-11-09T04:13:47.789037+00:00"
   },
   "cost": {
     "price_table_as_of": "2026-10-06",
     "judge": {
       "model": "claude-sonnet-5",
-      "calls": 4,
+      "calls": 13,
       "cache_hits": 0,
-      "input_tokens": 540,
-      "output_tokens": 48,
-      "usd": 0.00156
+      "input_tokens": 1350,
+      "output_tokens": 156,
+      "usd": 0.00426
     },
-    "reader": null,
+    "reader": {
+      "model": "claude-haiku-4-5",
+      "calls": 11,
+      "input_tokens": 1439,
+      "output_tokens": 136,
+      "usd": 0.002119
+    },
     "backend": null,
-    "total_usd": 0.00156,
-    "usd_per_1k_queries": 0.22285714285714286
+    "ingest_tokens_per_1k_writes": null,
+    "total_usd": 0.006378999999999999,
+    "usd_per_1k_queries": 0.5799090909090909
   }
 }
