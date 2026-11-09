@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -33,6 +34,8 @@ DEFAULT_JUDGE_MODEL = "claude-sonnet-5"
 DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 API_KEY_ENV = "MEMBENCH_JUDGE_API_KEY"
 _ANTHROPIC_VERSION = "2023-06-01"
+_MAX_ATTEMPTS = 5
+_BACKOFF_BASE_S = 1.0
 
 
 @dataclass
@@ -74,6 +77,22 @@ def parse_verdict(text: str) -> Verdict:
     return Verdict(passed=verdict == "pass", reason=str(obj.get("reason", "")))
 
 
+def _post_with_retry(http: Any, url: str, **kwargs: Any) -> Any:
+    """POST, retrying 429/5xx with exponential backoff (honours `Retry-After`)."""
+    for attempt in range(_MAX_ATTEMPTS):
+        resp = http.post(url, **kwargs)
+        retryable = resp.status_code == 429 or resp.status_code >= 500
+        if not retryable or attempt == _MAX_ATTEMPTS - 1:
+            break
+        try:
+            delay = float(resp.headers.get("retry-after"))
+        except (TypeError, ValueError):
+            delay = _BACKOFF_BASE_S * 2**attempt
+        time.sleep(delay)
+    resp.raise_for_status()
+    return resp
+
+
 class AnthropicClient:
     """Thin Anthropic Messages API judge client (the default, Claude)."""
 
@@ -91,7 +110,8 @@ class AnthropicClient:
 
     def complete(self, prompt: str, max_tokens: int = 4096) -> str:
         """Raw text completion — shared by `score()` and the pack generator."""
-        resp = self._http.post(
+        resp = _post_with_retry(
+            self._http,
             f"{self.base_url}/v1/messages",
             headers={
                 "x-api-key": self.api_key,
@@ -105,7 +125,6 @@ class AnthropicClient:
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
-        resp.raise_for_status()
         return resp.json()["content"][0]["text"]
 
     def score(self, rubric: str, evidence: str) -> Verdict:
@@ -130,7 +149,8 @@ class OpenAICompatibleClient:
 
     def complete(self, prompt: str) -> str:
         """Raw text completion — shared by `score()` and the pack generator."""
-        resp = self._http.post(
+        resp = _post_with_retry(
+            self._http,
             f"{self.base_url}/chat/completions",
             headers={
                 "Authorization": f"Bearer {self.api_key}",
@@ -142,7 +162,6 @@ class OpenAICompatibleClient:
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
-        resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
 
     def score(self, rubric: str, evidence: str) -> Verdict:

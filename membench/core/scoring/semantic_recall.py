@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def semantic_recall(
-    pack: Pack, traces: list[StepTrace], judge: "Judge | None"
+    pack: Pack, traces: list[StepTrace], judge: Judge | None
 ) -> float | None:
     if judge is None:
         return None

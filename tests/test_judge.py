@@ -1,5 +1,7 @@
+import httpx
 import pytest
 
+import membench.core.scoring.judge as judge_module
 from membench.core.scoring.judge import (
     AnthropicClient,
     CachedJudge,
@@ -13,11 +15,16 @@ from membench.core.scoring.judge import (
 
 
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200, headers=None):
         self._payload = payload
+        self.status_code = status_code
+        self.headers = headers or {}
 
     def raise_for_status(self):
-        return None
+        if self.status_code >= 400:
+            request = httpx.Request("POST", "https://example.test")
+            response = httpx.Response(self.status_code, request=request)
+            raise httpx.HTTPStatusError("error", request=request, response=response)
 
     def json(self):
         return self._payload
@@ -26,12 +33,15 @@ class FakeResponse:
 class FakeHTTP:
     """Records POSTs and returns a canned JSON body (no real network)."""
 
-    def __init__(self, payload):
+    def __init__(self, payload, responses=None):
         self.payload = payload
+        self.responses = list(responses or [])  # queued FakeResponses served first
         self.calls = []
 
     def post(self, url, headers=None, json=None):
         self.calls.append({"url": url, "headers": headers, "json": json})
+        if self.responses:
+            return self.responses.pop(0)
         return FakeResponse(self.payload)
 
 
@@ -90,6 +100,62 @@ def test_openai_compatible_client_posts_chat_completions_and_parses():
     assert call["url"] == "https://gateway.example/v1/chat/completions"
     assert call["headers"]["Authorization"] == "Bearer k"
     assert call["json"]["temperature"] == 0
+
+
+# --- retry / backoff --------------------------------------------------------
+
+@pytest.fixture
+def sleeps(monkeypatch):
+    recorded = []
+    monkeypatch.setattr(judge_module.time, "sleep", recorded.append)
+    return recorded
+
+
+def test_anthropic_client_retries_429_honouring_retry_after(sleeps):
+    http = FakeHTTP(
+        _anthropic_body('{"verdict": "pass"}'),
+        responses=[FakeResponse(None, 429, {"retry-after": "7"})],
+    )
+    client = AnthropicClient(api_key="k", http_client=http)
+
+    assert client.score("rubric", "evidence").passed is True
+    assert len(http.calls) == 2
+    assert sleeps == [7.0]
+
+
+def test_openai_client_retries_5xx_with_exponential_backoff(sleeps):
+    http = FakeHTTP(
+        _openai_body('{"verdict": "pass"}'),
+        responses=[FakeResponse(None, 503), FakeResponse(None, 500)],
+    )
+    client = OpenAICompatibleClient(
+        api_key="k", model="gpt-x", base_url="https://gateway.example/v1", http_client=http
+    )
+
+    assert client.score("rubric", "evidence").passed is True
+    assert len(http.calls) == 3
+    assert sleeps == [1.0, 2.0]
+
+
+def test_retry_gives_up_after_max_attempts(sleeps):
+    responses = [FakeResponse(None, 429) for _ in range(judge_module._MAX_ATTEMPTS)]
+    http = FakeHTTP(None, responses=responses)
+    client = AnthropicClient(api_key="k", http_client=http)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        client.score("rubric", "evidence")
+    assert len(http.calls) == judge_module._MAX_ATTEMPTS
+    assert len(sleeps) == judge_module._MAX_ATTEMPTS - 1
+
+
+def test_non_retryable_error_raises_immediately(sleeps):
+    http = FakeHTTP(None, responses=[FakeResponse(None, 401)])
+    client = AnthropicClient(api_key="k", http_client=http)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        client.score("rubric", "evidence")
+    assert len(http.calls) == 1
+    assert sleeps == []
 
 
 # --- cache ------------------------------------------------------------------

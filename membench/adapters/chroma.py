@@ -31,9 +31,9 @@ class ChromaAdapter(MemoryAdapter):
         super().__init__(config)
         self.top_k = int(self.config.get("top_k", 3))
         persist_dir = self.config.get("persist_dir", ".membench_chroma")
-        collection_name = self.config.get("collection_name", "membench")
+        self._collection_name = self.config.get("collection_name", "membench")
         self._client = chromadb.PersistentClient(path=persist_dir)
-        self._collection = self._client.get_or_create_collection(collection_name)
+        self._collection = self._client.get_or_create_collection(self._collection_name)
 
     def write(self, event: Event) -> None:
         self._collection.upsert(
@@ -65,3 +65,7 @@ class ChromaAdapter(MemoryAdapter):
 
     def forget(self, key: str) -> None:
         self._collection.delete(ids=[key])
+
+    def reset(self) -> None:
+        self._client.delete_collection(self._collection_name)
+        self._collection = self._client.get_or_create_collection(self._collection_name)

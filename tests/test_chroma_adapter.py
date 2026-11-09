@@ -4,7 +4,7 @@ from membench.core.adapter import Event
 
 chromadb = pytest.importorskip("chromadb", reason="chromadb not installed")
 
-from membench.adapters.chroma import ChromaAdapter  # noqa: E402
+from membench.adapters.chroma import ChromaAdapter
 
 
 def _event(key: str, content: str, session_id: str = "s1") -> Event:

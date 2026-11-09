@@ -62,8 +62,10 @@ def _render_single(report: dict) -> str:
         f"- **Backend:** {report.get('backend_name', '?')}",
         f"- **Started:** {report.get('started_at', '?')}",
         f"- **Finished:** {report.get('finished_at', '?')}",
-        f"- **Steps:** {len(report.get('traces', []))} "
-        f"({_count_queries(report)} queries)",
+        (
+            f"- **Steps:** {len(report.get('traces', []))} "
+            f"({_count_queries(report)} queries)"
+        ),
         "",
         "## Scores",
         "",

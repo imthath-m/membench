@@ -42,7 +42,9 @@ class Mem0Adapter(MemoryAdapter):
             self._ids[event.key] = memories[0]["id"]
 
     def recall(self, query: str) -> RecallResult:
-        result = self._client.search(query, user_id=self.user_id, limit=self.top_k)
+        result = self._client.search(
+            query, filters={"user_id": self.user_id}, top_k=self.top_k
+        )
         memories = result.get("results", []) if isinstance(result, dict) else result
         context = "\n".join(m["memory"] for m in memories)
         return RecallResult(
@@ -55,3 +57,7 @@ class Mem0Adapter(MemoryAdapter):
         memory_id = self._ids.pop(key, None)
         if memory_id is not None:
             self._client.delete(memory_id)
+
+    def reset(self) -> None:
+        self._client.delete_all(user_id=self.user_id)
+        self._ids.clear()

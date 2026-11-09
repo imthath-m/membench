@@ -21,11 +21,16 @@ class FakeMem0Client:
         self._store.append({"id": memory_id, "memory": content})
         return {"results": [{"id": memory_id, "memory": content}]}
 
-    def search(self, query, user_id=None, limit=3):
-        return {"results": self._store[:limit]}
+    def search(self, query, *, top_k=20, filters=None):  # mem0ai>=2.0 signature
+        assert filters and "user_id" in filters
+        return {"results": self._store[:top_k]}
 
     def delete(self, memory_id):
         self._store = [m for m in self._store if m["id"] != memory_id]
+
+    def delete_all(self, user_id=None):
+        self.deleted_all_for = user_id
+        self._store = []
 
 
 def _event(key: str, content: str, session_id: str = "s1") -> Event:
@@ -71,6 +76,18 @@ def test_recall_on_empty_adapter(adapter):
     assert result.context == ""
     assert result.items == []
     assert result.token_count == 0
+
+
+def test_reset_clears_memories_for_user_id(monkeypatch):
+    monkeypatch.setattr(mem0_module, "Memory", FakeMem0Client)
+    adapter = mem0_module.Mem0Adapter({"user_id": "run-42"})
+    adapter.write(_event("k1", "My favorite color is blue."))
+
+    adapter.reset()
+
+    assert adapter._client.deleted_all_for == "run-42"
+    assert adapter.recall("favorite color").context == ""
+    assert adapter._ids == {}
 
 
 def test_missing_install_raises_clear_error(monkeypatch):

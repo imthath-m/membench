@@ -32,9 +32,12 @@ def update_correctness(pack: Pack, traces: list[StepTrace]) -> float | None:
         if isinstance(step, WriteStep):
             if step.fact_type in _UPDATE_FACT_TYPES:
                 updated_keys.add(step.key)
-        elif isinstance(step, QueryStep):
-            if step.expect_key in updated_keys and step.expect_contains:
-                results.append(_passes(step.expect_contains, trace.detail["context"]))
+        elif (
+            isinstance(step, QueryStep)
+            and step.expect_key in updated_keys
+            and step.expect_contains
+        ):
+            results.append(_passes(step.expect_contains, trace.detail["context"]))
 
     if not results:
         return None

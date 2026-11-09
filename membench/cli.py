@@ -13,7 +13,12 @@ from membench.core.report.html import render_html
 from membench.core.report.json import write_json
 from membench.core.report.markdown import render_markdown
 from membench.core.runner import run_pack
-from membench.core.scoring.judge import API_KEY_ENV, DEFAULT_JUDGE_MODEL, build_judge, resolve_client
+from membench.core.scoring.judge import (
+    API_KEY_ENV,
+    DEFAULT_JUDGE_MODEL,
+    build_judge,
+    resolve_client,
+)
 from membench.generate.generator import GenerationError, generate_pack
 from membench.packs.schema import PackValidationError, builtin_pack_path, load_pack
 
@@ -32,6 +37,18 @@ def _resolve_pack_path(pack: str) -> Path:
     return builtin_pack_path(pack)
 
 
+def _load_backend_config(path: Path | None) -> dict:
+    """Read a JSON or YAML mapping of adapter config (YAML is a JSON superset)."""
+    if path is None:
+        return {}
+    data = yaml.safe_load(path.read_text())
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise TypeError(f"backend config {path} must be a JSON/YAML mapping")
+    return data
+
+
 @app.command()
 def run(
     backend: str = typer.Option(
@@ -45,6 +62,16 @@ def run(
     ),
     persist_dir: str = typer.Option(
         ".membench_chroma", "--persist-dir", help="Local persistence dir (chroma backend only)."
+    ),
+    backend_config: Path = typer.Option(
+        None,
+        "--backend-config",
+        help="JSON/YAML file of adapter config (e.g. mem0 user_id, top_k, mem0_config).",
+    ),
+    reset: bool = typer.Option(
+        True,
+        "--reset/--no-reset",
+        help="Clear the backend's stored state (its collection / user_id) before the run.",
     ),
     judge: bool = typer.Option(
         True, "--judge/--no-judge", help="Enable the LLM judge (semantic recall + contradiction rate)."
@@ -66,7 +93,10 @@ def run(
         pack_path = _resolve_pack_path(pack)
         loaded_pack = load_pack(pack_path)
         adapter_cls = get_adapter_class(backend)
-    except (PackValidationError, ValueError, ImportError) as exc:
+        adapter_config = {"persist_dir": persist_dir, **_load_backend_config(backend_config)}
+    except (
+        PackValidationError, ValueError, TypeError, ImportError, OSError, yaml.YAMLError
+    ) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
@@ -82,7 +112,9 @@ def run(
                 err=True,
             )
 
-    adapter = adapter_cls({"persist_dir": persist_dir})
+    adapter = adapter_cls(adapter_config)
+    if reset:
+        adapter.reset()
     result = run_pack(loaded_pack, adapter, backend_name=backend, judge=judge_obj)
     write_json(result, out)
     typer.echo(f"Wrote report for pack={loaded_pack.name!r} backend={backend!r} to {out}")

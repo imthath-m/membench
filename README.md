@@ -74,7 +74,9 @@ membench run --backend full-context --pack customer-support \
 
 Works with Anthropic, OpenAI, Gemini, or any OpenAI-compatible endpoint.
 Judge responses are cached on disk (`--judge-cache`) keyed by (model, prompt
-hash) so CI can replay scored runs without network access. Without an API
+hash) so CI can replay scored runs without network access. Rate-limit (429)
+and 5xx responses are retried with exponential backoff, honouring
+`Retry-After`. Without an API
 key, `--judge` degrades gracefully: the two judge metrics score `null` and
 everything else still runs.
 
@@ -83,6 +85,11 @@ everything else still runs.
 See `membench list` for the current set. Shipped: `full-context` (baseline,
 no vendor dep), `chroma` (local vector store, no vendor dep), `mem0`
 (`membench[mem0]`, see [docs/mem0.md](docs/mem0.md)).
+
+Pass adapter config with `--backend-config path.yaml` (JSON or YAML mapping,
+merged over `{"persist_dir": --persist-dir}`). Each run starts clean: the
+adapter's `reset()` clears state left by earlier runs (chroma collection,
+mem0 `user_id`); pass `--no-reset` to keep it.
 
 ## Metric definitions
 
@@ -143,6 +150,7 @@ class MemoryAdapter(ABC):
     def write(self, event: Event) -> None: ...            # ingest one fact/turn/tool-result
     def recall(self, query: str) -> RecallResult: ...     # return injected context + items
     def forget(self, key: str) -> None: ...               # remove by stable key
+    def reset(self) -> None: ...                          # optional: clear persisted state
 ```
 
 `membench/adapters/mem0.py` is the worked example for a real (optional-extra)
@@ -188,7 +196,9 @@ class Mem0Adapter(MemoryAdapter):
             self._ids[event.key] = memories[0]["id"]
 
     def recall(self, query: str) -> RecallResult:
-        result = self._client.search(query, user_id=self.user_id, limit=self.top_k)
+        result = self._client.search(
+            query, filters={"user_id": self.user_id}, top_k=self.top_k
+        )
         memories = result.get("results", []) if isinstance(result, dict) else result
         context = "\n".join(m["memory"] for m in memories)
         return RecallResult(
@@ -201,6 +211,10 @@ class Mem0Adapter(MemoryAdapter):
         memory_id = self._ids.pop(key, None)
         if memory_id is not None:
             self._client.delete(memory_id)
+
+    def reset(self) -> None:
+        self._client.delete_all(user_id=self.user_id)
+        self._ids.clear()
 ```
 
 Things to note from that example, which apply to any new adapter:
@@ -223,7 +237,8 @@ Things to note from that example, which apply to any new adapter:
    under `docs/` (see `docs/mem0.md`).
 
 That's the whole surface — `write`, `recall`, `forget`, a registry line, and
-an import guard.
+an import guard. Override `reset()` (default no-op) if the backend persists
+state across runs; `membench run` calls it before replaying the pack.
 
 ## Development
 

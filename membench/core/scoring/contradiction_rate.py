@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 def contradiction_rate(
-    pack: Pack, traces: list[StepTrace], judge: "Judge | None"
+    pack: Pack, traces: list[StepTrace], judge: Judge | None
 ) -> float | None:
     if judge is None:
         return None

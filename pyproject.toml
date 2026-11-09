@@ -36,7 +36,7 @@ Issues = "https://github.com/imthath-m/membench/issues"
 
 [project.optional-dependencies]
 chroma = ["chromadb>=0.5"]
-mem0 = ["mem0ai>=0.1"]
+mem0 = ["mem0ai>=2.0"]
 dev = ["pytest>=8.0", "ruff>=0.6", "build>=1.0"]
 
 [project.scripts]
@@ -50,3 +50,6 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option"]

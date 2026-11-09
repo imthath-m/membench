@@ -57,3 +57,6 @@ class MemoryAdapter(ABC):
     @abstractmethod
     def forget(self, key: str) -> None:
         """Remove a previously written event by its stable key."""
+
+    def reset(self) -> None:
+        """Clear any state persisted by earlier runs. Default: no-op."""

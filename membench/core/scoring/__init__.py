@@ -24,18 +24,18 @@ if TYPE_CHECKING:
     from membench.core.scoring.judge import Judge
 
 __all__ = [
-    "score_run",
-    "recall_precision",
-    "update_correctness",
-    "token_cost",
-    "p95_latency_ms",
-    "semantic_recall",
     "contradiction_rate",
+    "p95_latency_ms",
+    "recall_precision",
+    "score_run",
+    "semantic_recall",
+    "token_cost",
+    "update_correctness",
 ]
 
 
 def score_run(
-    pack: Pack, traces: list[StepTrace], judge: "Judge | None" = None
+    pack: Pack, traces: list[StepTrace], judge: Judge | None = None
 ) -> dict[str, Any]:
     """Compute all metrics for a completed run.
 
