@@ -107,10 +107,14 @@ Status: in progress
 - [x] `membench/datasets/` loader core: pinned revision download, sha256 check, cache under `~/.cache/membench`, in-memory `Pack`; manifest `dataset`; `rescore` loader hook
 - [x] `membench convert` writes YAML locally (inspection only)
 - [x] LongMemEval loader (S / M / oracle) + official judge prompt for QA accuracy
-- [ ] LoCoMo loader (adversarial → abstain) + gold-answer exclusion list; scores with and without it
+- [x] LoCoMo loader (adversarial → abstain) + gold-answer exclusion list; scores with and without it (structural audit only; see Blocked)
 - [x] `--limit` / `--sample N --seed` stratified subsets
 - [x] Synthetic generator v2 (seeded, template-based; sessions, distractors, update chains, time gaps, multi-hop, abstention, forget; optional LLM paraphrase pass)
 - [x] Packs ≥200 queries, ≥30 per category: `tool_call_memory`, `document_chain`, `multi_step_decisions`, scaled `customer_support` / `coding_assistant`; byte-identical per seed
-- [ ] Tests (fixtures only, no dataset content) + README docs
+- [x] Tests (fixtures only, no dataset content) + README docs
 - [ ] LongMemEval_S and LoCoMo end-to-end on `full-context` and `chroma`
 - [ ] Full-context oracle QA accuracy within ±3pp of the paper
+- [ ] Lower priority: BEAM / MemoryAgentBench loaders (deferred)
+- Blocked: ±3pp LongMemEval reproduction — needs a reader + judge API key (paper used GPT-4o for both). Official reader/judge prompts are wired in and checked verbatim against upstream (`qa_style: longmemeval`). Once a key exists: `MEMBENCH_JUDGE_API_KEY=<openai key> membench run --backend full-context --pack longmemeval-oracle --reader-model gpt-4o-2024-08-06 --reader-base-url https://api.openai.com/v1 --judge-model gpt-4o-2024-08-06 --judge-base-url https://api.openai.com/v1 --out lme-oracle.json`, then compare `scores.qa_accuracy` (and `by_category`) to the paper's oracle row for that reader. Known gap sources to check: our context is full-context's `[ts] [role] content` lines, not the official per-session JSON history; Anthropic reader `max_tokens` is 256 (official 500); the cleaned dataset release (2025-09) differs from the paper's original files.
+- Blocked: human audit of LoCoMo gold answers — needs a human annotator. `locomo_exclusions.yaml` holds the 9 items an automated structural audit flagged (unresolvable / missing evidence, adversarial items with a contradicting gold answer); add human findings in the same format.
+- Deferred (lower priority, per roadmap): BEAM and MemoryAgentBench loaders. License check done: HF `ai-hyz/MemoryAgentBench` is tagged MIT; a HF `Mohammadta/BEAM` dataset is tagged CC BY-SA 4.0 but is not yet confirmed as BEAM's official release.
