@@ -1,12 +1,18 @@
 name: Live run
 
 # Manual only: spends real API credit. Needs repository secrets
-# OPENAI_API_KEY (Mem0's default LLM/embedder) and MEMBENCH_JUDGE_API_KEY.
+# MEMBENCH_JUDGE_API_KEY, OPENAI_API_KEY (Mem0 OSS / LangMem / Cognee LLM + embedder)
+# and, per hosted backend, MEM0_API_KEY / ZEP_API_KEY / LETTA_API_KEY.
 on:
   workflow_dispatch:
     inputs:
+      backend:
+        description: "Backend to run (all = mem0 plus every Phase 14 backend)"
+        type: choice
+        default: "mem0"
+        options: [mem0, mem0-platform, zep, letta, letta-agent, langmem, cognee, all]
       pack:
-        description: "Pack to run against mem0"
+        description: "Pack to run"
         default: "mini"
       judge_model:
         description: "Judge model id"
@@ -23,6 +29,7 @@ on:
 
 jobs:
   mem0:
+    if: inputs.backend == 'mem0' || inputs.backend == 'all'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -75,5 +82,84 @@ jobs:
           path: |
             live-report.json
             live-report.md
+            .membench_judge_cache.json
+          if-no-files-found: warn
+
+  backends:
+    if: inputs.backend != 'mem0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: ${{ fromJSON(inputs.backend == 'all'
+          && '["mem0-platform","zep","letta","letta-agent","langmem","cognee"]'
+          || format('["{0}"]', inputs.backend)) }}
+    env:
+      BACKEND: ${{ matrix.backend }}
+      MEMBENCH_JUDGE_API_KEY: ${{ secrets.MEMBENCH_JUDGE_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LLM_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # Cognee's LLM / embedder key
+      MEM0_API_KEY: ${{ secrets.MEM0_API_KEY }}
+      ZEP_API_KEY: ${{ secrets.ZEP_API_KEY }}
+      LETTA_API_KEY: ${{ secrets.LETTA_API_KEY }}
+    steps:
+      - name: Check secrets
+        run: |
+          case "$BACKEND" in
+            mem0-platform) need="MEM0_API_KEY" ;;
+            zep) need="ZEP_API_KEY" ;;
+            letta|letta-agent) need="LETTA_API_KEY" ;;
+            langmem|cognee) need="OPENAI_API_KEY" ;;
+          esac
+          for key in MEMBENCH_JUDGE_API_KEY $need; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Set the $key repository secret to run $BACKEND live."
+              exit 1
+            fi
+          done
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install membench (backend extra, frozen from uv.lock)
+        run: |
+          pip install uv
+          extra="${BACKEND%-agent}"  # letta-agent ships in the letta extra
+          uv sync --frozen --extra "$extra" --extra tokens --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Gated live contract test (mini)
+        run: MEMBENCH_LIVE=1 pytest "tests/test_live_backends.py::test_live_mini_runs_clean[$BACKEND]" -rs
+
+      - name: Live run with judge
+        env:
+          PACK: ${{ inputs.pack }}
+          JUDGE_MODEL: ${{ inputs.judge_model }}
+          JUDGE_BASE_URL: ${{ inputs.judge_base_url }}
+          READER_MODEL: ${{ inputs.reader_model }}
+          REPEATS: ${{ inputs.repeats }}
+        run: |
+          args=()
+          if [ -n "$JUDGE_BASE_URL" ]; then args+=(--judge-base-url "$JUDGE_BASE_URL"); fi
+          if [ -n "$READER_MODEL" ]; then args+=(--reader-model "$READER_MODEL"); fi
+          membench run --backend "$BACKEND" --pack "$PACK" --judge --judge-model "$JUDGE_MODEL" \
+            --repeats "$REPEATS" "${args[@]}" --out "live-$BACKEND.json"
+          membench rescore --in "live-$BACKEND.json" --check
+          membench report --in "live-$BACKEND.json" --format md --out "live-$BACKEND.md"
+          cat "live-$BACKEND.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-${{ matrix.backend }}-${{ inputs.pack }}
+          path: |
+            live-${{ matrix.backend }}.json
+            live-${{ matrix.backend }}.md
             .membench_judge_cache.json
           if-no-files-found: warn
