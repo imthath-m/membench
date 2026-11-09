@@ -91,6 +91,24 @@ and 5xx responses are retried with exponential backoff, honouring
 key, `--judge` degrades gracefully: the judge metrics score `null` and
 everything else still runs.
 
+### Judge validation
+
+Judge metrics are **`unvalidated`** in every report until human labels show
+the judge agrees with people: reports mark a judge metric validated only when
+the committed `validation/agreement-v<JUDGE_PROMPT_VERSION>.json` passes the
+run's judge model on it (human–human κ ≥ 0.7, judge–human κ ≥ 0.6 and within
+0.1 of it, n ≥ 200). No labels are committed yet, so there are no agreement
+numbers to cite. Workflow, file formats and the prompt-versioning policy:
+[docs/judge-validation.md](docs/judge-validation.md); annotator rules:
+[docs/labelling-guidelines.md](docs/labelling-guidelines.md).
+
+```bash
+membench judge-sample --in run-a.json --in run-b.json      # stratified items → validation/sample.jsonl
+membench judge-labels --annotator a=a.jsonl --annotator b=b.jsonl --adjudication adj.jsonl
+membench judge-cross --judges configs/judges.yaml          # Claude, GPT, open-weight (needs keys)
+membench judge-agreement --labels validation/labels.jsonl --verdicts validation/verdicts-v1.jsonl
+```
+
 ### Reader stage (QA accuracy)
 
 `--reader-model` adds a reader: an LLM answers each query that has a gold
