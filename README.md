@@ -49,6 +49,9 @@ membench report --in report.json --format html --out report.html
 
 # compare two runs side by side
 membench report --in report.json --in other_report.json --format html --out compare.html
+
+# is the difference real? paired test on the same queries
+membench compare --a report.json --b other_report.json --out compare.md
 ```
 
 List available packs and backends:
@@ -276,10 +279,43 @@ when unset); `membench report` renders it as a table.
 - **`error_rate`** — fraction of steps (write + query + forget) whose adapter call
   failed or timed out. Above 10% the run is marked `"valid": false`.
 
+Every score also carries n and a 95% CI in the report's `stats` block —
+see [Statistics](#statistics).
+
 Deterministic metrics (everything not marked judge or reader) always run
 offline. The judge metrics need `--judge` (default on) and
 `MEMBENCH_JUDGE_API_KEY`; with `--no-judge` or no key, they score `null`.
 `abstention` needs the reader; `qa_accuracy` needs both.
+
+### Statistics
+
+- **Per-query outcomes.** `outcomes` holds each query-level metric's
+  per-query result (`{metric: {step_index: true/false or number}}`); every
+  score is their mean.
+- **95% CIs.** `stats.scores[metric]` and `stats.by_category[cat][metric]`
+  hold `{n, ci, method, indicative}`: Wilson intervals for pass/fail rates,
+  a seeded percentile bootstrap over queries (10k resamples) for
+  `evidence_recall_at_k` and `token_cost`, and Wilson over steps for
+  `error_rate`. Latency entries carry n only. The bootstrap is seeded from
+  `--seed` + metric + category, so `rescore` reproduces every interval.
+- **Minimum n.** Reports label a rate `indicative` below 385 queries
+  overall (±5pp at 95%, p = 0.5) or 100 per category (±10pp); p95 latency
+  is suppressed below 100 samples per stage.
+- **Repeats.** `--repeats N` runs the pack N times, each with a new backend
+  namespace (`config["namespace"]` = `membench-r<i>`, which Chroma uses as
+  its collection and Mem0 as its `user_id` unless you set those explicitly)
+  and a fresh `reset()`. Default: 3 when the backend (`uses_llm`), judge
+  or reader calls an LLM, else 1. The top-level report is repeat 0;
+  `repeats` holds the full reports of the others and `repeat_summary` each
+  score's mean, run-to-run SD and per-repeat values.
+- **Paired comparison.** `membench compare --a A.json --b B.json` pairs the
+  two runs' outcomes by query (overall and per category): B − A with a
+  paired bootstrap 95% CI, McNemar's exact test for pass/fail metrics
+  (bootstrap p otherwise), and Holm's correction across all metric ×
+  category rows. A row is a real difference only when its Holm p < 0.05 and
+  its CI excludes 0; otherwise it says "CI includes 0". It refuses runs on
+  different packs/subsets or with different judge/reader models or prompt
+  versions. `--out x.json` writes the raw rows, any other path Markdown.
 
 ### Reproducibility
 
@@ -294,7 +330,7 @@ Every report carries a `manifest` and validates against
   change it); dataset id/revision/sha256 (`null` until dataset loaders land).
 - Judge model, base URL and prompt version; reader model, base URL and
   prompt version (`null` without `--reader-model`); tokenizer name; `--seed`;
-  `--repeat-index`; start/finish times.
+  repeat index; start/finish times.
 
 Re-score a report from its traces and the judge cache — no adapter, no
 network, no API key:
@@ -305,8 +341,9 @@ membench rescore --in report.json --judge-cache .membench_judge_cache.json --che
 
 It reloads the pack (`--pack`, default: the manifest's pack name), refuses
 one whose sha256 differs from the run's, replays the judge with a strict
-cache, and prints whether the scores are identical (`--check` exits 1 if
-not; `--out` writes the re-scored report). CI re-scores a committed report
+cache, and prints whether the scores, outcomes and CIs (of every repeat)
+are identical (`--check` exits 1 if not; `--out` writes the re-scored
+report). CI re-scores a committed report
 (`tests/fixtures/`) on every push.
 
 Published runs are made from a frozen sync of `uv.lock`
@@ -369,6 +406,8 @@ class MemoryAdapter(ABC):
     retryable: tuple[type[BaseException], ...] = ()       # transient errors to retry
     packages: tuple[str, ...] = ()                        # SDK dists recorded in the manifest
     deployment: str = "local"                             # "local" | "hosted" (region: config)
+    uses_llm: bool = False                                # LLM-backed: default --repeats 3
+    namespace: str                                        # config["namespace"], new per repeat
     def __init__(self, config: dict | None = None): ...   # plain dict from pack/CLI config
     def write(self, event: Event) -> None: ...             # ingest one fact/turn/tool-result
     def recall(self, query: str, *, session_id: str, at: str) -> RecallResult: ...
@@ -391,7 +430,8 @@ What the runner guarantees:
   forgets; its time is traced as `ingest_latency_ms`, separate from recall
   latency.
 - `reset()` runs before the run (unless `--no-reset`) and between a pack's
-  episodes.
+  episodes. With `--repeats`, each repeat gets a new adapter whose
+  `namespace` (`config["namespace"]`) is new; keep persistent state under it.
 - `usage()` (default `None`) is read once at the end and stored as the
   report's `usage`. Keys: `llm_input_tokens`, `llm_output_tokens`,
   `embedding_tokens`, priced against `describe()`'s `llm_model` /
@@ -432,6 +472,7 @@ class Mem0Adapter(MemoryAdapter):
 
     retryable = _RETRYABLE
     packages = ("mem0ai", "openai")
+    uses_llm = True
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         if Memory is None:
@@ -441,7 +482,7 @@ class Mem0Adapter(MemoryAdapter):
                 "to use the mem0 backend."
             )
         super().__init__(config)
-        self.user_id = self.config.get("user_id", "membench")
+        self.user_id = self.config.get("user_id", self.namespace)
         self.top_k = int(self.config.get("top_k", 3))
         mem0_config = self.config.get("mem0_config")
         self._client = Memory.from_config(mem0_config) if mem0_config else Memory()

@@ -17,6 +17,9 @@ on:
       reader_model:
         description: "Reader model id for qa_accuracy / abstention (empty = no reader)"
         default: ""
+      repeats:
+        description: "Repeats of the run (fresh mem0 user_id each; report holds mean + SD)"
+        default: "3"
 
 jobs:
   mem0:
@@ -53,12 +56,13 @@ jobs:
           JUDGE_MODEL: ${{ inputs.judge_model }}
           JUDGE_BASE_URL: ${{ inputs.judge_base_url }}
           READER_MODEL: ${{ inputs.reader_model }}
+          REPEATS: ${{ inputs.repeats }}
         run: |
           args=()
           if [ -n "$JUDGE_BASE_URL" ]; then args+=(--judge-base-url "$JUDGE_BASE_URL"); fi
           if [ -n "$READER_MODEL" ]; then args+=(--reader-model "$READER_MODEL"); fi
           membench run --backend mem0 --pack "$PACK" --judge --judge-model "$JUDGE_MODEL" \
-            "${args[@]}" --out live-report.json
+            --repeats "$REPEATS" "${args[@]}" --out live-report.json
           membench rescore --in live-report.json --check
           membench report --in live-report.json --format md --out live-report.md
           cat live-report.md >> "$GITHUB_STEP_SUMMARY"

@@ -27,8 +27,12 @@ jobs:
       - name: Test
         run: pytest
 
-      - name: Offline example run (no judge, no API key)
-        run: membench run --backend full-context --pack customer-support --no-judge --out report.json
+      - name: Offline example run (no judge, no API key; 2 repeats)
+        run: |
+          membench run --backend full-context --pack customer-support --no-judge --repeats 2 \
+            --out report.json
+          membench rescore --in report.json --check
+          membench compare --a report.json --b report.json
 
       - name: Verify example report
         run: |
@@ -38,6 +42,8 @@ jobs:
           assert data['pack_name'] == 'customer_support'
           assert data['backend_name'] == 'full-context'
           assert data['scores']['recall_precision'] is not None
+          assert data['stats']['scores']['recall_precision']['ci'] is not None
+          assert data['repeat_summary']['n'] == 2
           import jsonschema
           jsonschema.validate(data, json.load(open('membench/report.schema.json')))
           print('offline example run produced a valid report')
