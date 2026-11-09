@@ -69,6 +69,10 @@ minimum, so every number here is **indicative**.
 - **Temporal questions need dates in the context.** Chroma and BM25 return
   bare text with no timestamps; full context prints them
   ([100%][tcm-fc] vs chroma [86%][tcm-chroma] temporal accuracy).
+- **Forget compliance** is [100%][cs-fc] for every row on both packs: the
+  offline baselines delete forgotten turns outright. (Before the follow-up
+  fix to whole-word matching, full context read 92% on customer-support-xl:
+  the forgotten value `Pro` was "found" inside "approved" and "problem".)
 - **Cost:** $0 per 1k queries for all four rows (no LLM anywhere); the
   memory-system rows will add backend extraction and embedding spend.
 - **Latency:** recall p95 is under 1 ms for the in-memory baselines and
@@ -86,12 +90,6 @@ From `membench report --in <report.json> --failures --out failures.md`:
 - **Not retrieved** (chroma, tool-call-memory, step 127, multi-hop "What
   timezone is the person handling OPS-91 in?"): evidence `e3-w2`, `e3-w3`;
   recalled three repeated `get_time()` tool outputs instead. [report][tcm-chroma]
-- **Forget violation, a metric artifact** (full-context, customer-support-xl,
-  step 98): `Pro` was forgotten and is gone from the context, but the
-  case-insensitive substring check matches "ap*pro*ved" and "*pro*blem". This
-  explains full context's [92%][cs-fc] forget compliance on this pack; it is a
-  known issue in `contains_any` (word-boundary matching is the fix), not a
-  backend failure.
 
 Failure counts (not retrieved / stale surfaced): bm25 70 / 25, chroma 8 / 35,
 full context 0 / 36 on tool-call-memory; bm25 60 / 28, chroma 18 / 36, full
@@ -107,8 +105,9 @@ context 0 / 36 on customer-support-xl. The oracle has none.
   config because the offline backends are deterministic.
 - No judge, so no judge metrics; when they arrive they are marked
   `unvalidated` until the human-label validation (Phase 15) is committed.
-- Staleness and forget compliance use substring matching on short values,
-  which over-counts (see the forget example above).
+- Staleness and forget compliance match `expect_absent` values as whole
+  words (case-insensitive); recall precision, update correctness and
+  temporal accuracy match `expect_contains` as plain substrings.
 
 ## Pending
 

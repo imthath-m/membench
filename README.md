@@ -296,6 +296,13 @@ when unset); `membench report` renders it as a table.
 - **`forget_compliance`** — fraction of `category: forget` queries whose
   context contains none of their `expect_absent` strings and whose recalled
   items trace back to no forgotten event id.
+- `expect_absent` checks (staleness, forget compliance) match whole words or
+  phrases, case-insensitive: a needle must not touch a letter, digit or `_`
+  on either side, so `Pro` matches "plan: Pro." but not "approved", and
+  `$49.99` or `C++` still match. `expect_contains` checks stay plain
+  case-insensitive substrings. Both choices avoid penalising a backend for a
+  near-miss: a stale value inside another word is not a leak, and an
+  expected value inside an inflection ("tickets") is still a hit.
 - **`evidence_recall_at_k`** — for queries with `evidence`, the mean
   fraction of evidence event ids among the recalled items'
   `event_ids` (k = the items the backend returned, its own top-k).

@@ -3,12 +3,14 @@
 Over the post-update queries `update_correctness` scores (a query whose
 `expect_key` was updated or contradicted earlier in its episode) that also
 declare `expect_absent`: the fraction whose context still contains any of
-those stale strings (case-insensitive). Lower is better. Deterministic; a
-backend that keeps everything (full-context) passes `update_correctness`
-but scores badly here.
+those stale strings (case-insensitive, whole words; see `contains_any`).
+Lower is better. Deterministic; a backend that keeps everything
+(full-context) passes `update_correctness` but scores badly here.
 """
 
 from __future__ import annotations
+
+import re
 
 from membench.core.runner import StepTrace
 from membench.core.stats import mean_of
@@ -18,8 +20,18 @@ _UPDATE_FACT_TYPES = {"update", "contradict"}
 
 
 def contains_any(needles: list[str], context: str) -> bool:
-    context_lower = context.lower()
-    return any(needle.lower() in context_lower for needle in needles)
+    """Whether any needle occurs in `context` as a whole word or phrase.
+
+    Case-insensitive; needles are literal (regex-escaped). A match must not
+    touch a word character on either side, so "Pro" matches "plan: Pro."
+    but not "approved", and needles that start or end with punctuation
+    ("$49.99", "C++") still match. `expect_contains` checks stay plain
+    substrings, so neither check penalises a near-miss (README, Metrics).
+    """
+    return any(
+        re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", context, re.IGNORECASE)
+        for needle in needles
+    )
 
 
 def staleness(pack: Pack, traces: list[StepTrace]) -> float | None:
