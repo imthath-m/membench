@@ -86,6 +86,7 @@ class Mem0PlatformAdapter(MemoryAdapter):
         self._client.delete_all(user_id=self.user_id)
         self._episode += 1  # a fresh user per episode, even if deletion lags
         self.user_id = f"{self.namespace}-e{self._episode}"
+        self._client.delete_all(user_id=self.user_id)  # left over from an earlier run
 
     def describe(self) -> dict[str, Any]:
         return {"top_k": self.top_k, "host": self._client.host}
