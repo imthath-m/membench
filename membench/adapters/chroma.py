@@ -32,7 +32,7 @@ class ChromaAdapter(MemoryAdapter):
         super().__init__(config)
         self.top_k = int(self.config.get("top_k", 3))
         persist_dir = self.config.get("persist_dir", ".membench_chroma")
-        self._collection_name = self.config.get("collection_name", "membench")
+        self._collection_name = self.config.get("collection_name", self.namespace)
         self._client = chromadb.PersistentClient(path=persist_dir)
         self._collection = self._client.get_or_create_collection(self._collection_name)
 

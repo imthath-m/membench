@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from membench.core.runner import StepTrace
 from membench.core.scoring.judge import JudgeError, record_judge_error
+from membench.core.stats import mean_of
 from membench.packs.schema import Pack, QueryStep
 
 if TYPE_CHECKING:
@@ -22,22 +23,25 @@ if TYPE_CHECKING:
 def semantic_recall(
     pack: Pack, traces: list[StepTrace], judge: Judge | None
 ) -> float | None:
-    if judge is None:
-        return None
+    return mean_of(semantic_recall_outcomes(pack, traces, judge))
 
-    results: list[bool] = []
+
+def semantic_recall_outcomes(
+    pack: Pack, traces: list[StepTrace], judge: Judge | None
+) -> dict[int, bool]:
+    if judge is None:
+        return {}
+
+    results: dict[int, bool] = {}
     for step, trace in zip(pack.steps, traces):
         if isinstance(step, QueryStep) and step.judge and step.judge.semantic_recall:
             if trace.error is not None:  # a failed recall conveyed nothing
-                results.append(False)
+                results[trace.step_index] = False
                 continue
             try:
                 verdict = judge.score(step.judge.semantic_recall, trace.detail["context"])
             except JudgeError as exc:
                 record_judge_error(trace.detail, "semantic_recall", exc)
                 continue
-            results.append(verdict.passed)
-
-    if not results:
-        return None
-    return sum(results) / len(results)
+            results[trace.step_index] = verdict.passed
+    return results

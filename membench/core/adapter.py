@@ -60,15 +60,26 @@ class MemoryAdapter(ABC):
     Construction takes a plain dict of config (from pack/CLI config).
     `retryable` lists transient exception types (rate limits, timeouts) the
     runner retries with backoff; anything else fails the step. `packages` and
-    `deployment` (plus `describe()`) feed the run manifest.
+    `deployment` (plus `describe()`) feed the run manifest; `uses_llm` sets the
+    default number of repeats.
     """
 
     retryable: tuple[type[BaseException], ...] = ()
     packages: tuple[str, ...] = ()  # backend SDK distributions whose versions the manifest records
     deployment: str = "local"  # "local" | "hosted"; a hosted region comes from config["region"]
+    uses_llm: bool = False  # backend calls an LLM (non-deterministic): default --repeats 3
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config = config or {}
+
+    @property
+    def namespace(self) -> str:
+        """Where this run's state lives (`config["namespace"]`, default "membench").
+
+        Backends with persistent state default their collection / user id to it;
+        the CLI gives each repeat a new one.
+        """
+        return self.config.get("namespace", "membench")
 
     @abstractmethod
     def write(self, event: Event) -> None:

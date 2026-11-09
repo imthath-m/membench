@@ -11,16 +11,18 @@ from __future__ import annotations
 
 from membench.core.runner import StepTrace
 from membench.core.scoring.recall_precision import _passes
+from membench.core.stats import mean_of
 from membench.packs.schema import Pack, QueryStep
 
 
 def temporal_accuracy(pack: Pack, traces: list[StepTrace]) -> float | None:
     """None if no temporal query declares `expect_contains`."""
-    results = [
-        _passes(step.expect_contains, trace.detail["context"])
+    return mean_of(temporal_accuracy_outcomes(pack, traces))
+
+
+def temporal_accuracy_outcomes(pack: Pack, traces: list[StepTrace]) -> dict[int, bool]:
+    return {
+        trace.step_index: _passes(step.expect_contains, trace.detail["context"])
         for step, trace in zip(pack.steps, traces)
         if isinstance(step, QueryStep) and step.category == "temporal" and step.expect_contains
-    ]
-    if not results:
-        return None
-    return sum(results) / len(results)
+    }

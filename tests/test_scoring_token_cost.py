@@ -2,15 +2,15 @@ from membench.core.runner import StepTrace
 from membench.core.scoring.token_cost import token_cost
 
 
-def _trace(step_type: str, token_count: int = 0) -> StepTrace:
+def _trace(step_type: str, token_count: int = 0, index: int = 0) -> StepTrace:
     detail = {"token_count": token_count} if step_type == "query" else {}
     return StepTrace(
-        step_index=0, step_type=step_type, session_id="s1", latency_ms=1.0, detail=detail
+        step_index=index, step_type=step_type, session_id="s1", latency_ms=1.0, detail=detail
     )
 
 
 def test_mean_of_query_token_counts():
-    traces = [_trace("query", 10), _trace("query", 20)]
+    traces = [_trace("query", 10), _trace("query", 20, index=1)]
 
     assert token_cost(traces) == 15.0
 
