@@ -1,6 +1,28 @@
 # Build progress — roadmap Phases 8–16
 Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the highest phase branch; read this file there; continue the first phase not marked done.
 
+## Overall status (Phases 8–16)
+All code, tests, workflows and docs are in. What is left needs keys, people or a merge. One checklist:
+
+- [ ] **Merge the stack to `main`** (#4 → #5 → #6 … #14, in order). Scheduled workflows (`smoke.yml`) only run from the default branch.
+- [ ] **Repository secrets:** `MEMBENCH_JUDGE_API_KEY` (Anthropic judge/reader), `OPENAI_API_KEY` (Mem0 OSS, LangMem, Cognee; OpenAI judge for LongMemEval), `MEM0_API_KEY`, `ZEP_API_KEY`, `LETTA_API_KEY`, `TOGETHER_API_KEY` (open-weight judge). Every item below needs some of these.
+- [ ] **P8/P9 first live run:** `gh workflow run live.yml -f backend=mem0 -f pack=customer-support` (`OPENAI_API_KEY`, `MEMBENCH_JUDGE_API_KEY`).
+- [ ] **P10 cost check:** after that run, compare `live-report.json` `cost.backend` / `cost.judge` with the OpenAI + Anthropic usage dashboards (within 5%); re-verify the OpenAI rows of `membench/prices.yaml` first.
+- [ ] **P11 reader metrics live:** `gh workflow run live.yml -f backend=mem0 -f pack=customer-support -f reader_model=claude-haiku-4-5`.
+- [ ] **P12 LongMemEval ±3pp:** `MEMBENCH_JUDGE_API_KEY=<openai key> membench run --backend full-context --pack longmemeval-oracle --reader-model gpt-4o-2024-08-06 --reader-base-url https://api.openai.com/v1 --judge-model gpt-4o-2024-08-06 --judge-base-url https://api.openai.com/v1 --out lme-oracle.json`; compare `scores.qa_accuracy` to the paper.
+- [ ] **P12 LoCoMo human audit:** annotator reviews gold answers; add findings to `membench/datasets/locomo_exclusions.yaml`.
+- [ ] **P12 deferred (optional):** BEAM / MemoryAgentBench loaders.
+- [ ] **P13 LLM repeats:** `gh workflow run live.yml -f backend=mem0 -f pack=customer-support -f repeats=3`; check repeat CIs overlap; `membench rescore --in <report> --check`.
+- [ ] **P14 hosted backends live:** `gh workflow run live.yml -f backend=all -f pack=mini` (`MEM0_API_KEY`, `ZEP_API_KEY`, `LETTA_API_KEY`, `OPENAI_API_KEY`, `MEMBENCH_JUDGE_API_KEY`).
+- [ ] **P14 vendor review (manual):** open the 5 issues drafted in `docs/vendor-review.md`; put vendor-tuned configs in `configs/vendor-tuned/<backend>.yaml` when they reply, then run with `-f config=vendor-tuned`.
+- [ ] **P15 human labels:** 2 annotators + adjudication on `validation/sample.jsonl` (docs/labelling-guidelines.md) → `membench judge-labels --annotator a=a.jsonl --annotator b=b.jsonl [--adjudication adj.jsonl]`.
+- [ ] **P15 cross-judge + agreement:** `gh workflow run judge-validation.yml` (`MEMBENCH_JUDGE_API_KEY`, `OPENAI_API_KEY`, `TOGETHER_API_KEY`); commit `validation/` outputs; update `test_no_committed_validation_result_means_unvalidated`.
+- [ ] **P15 qa_accuracy items:** reader runs (`--reader-model`) per backend on synthetic packs, re-run `membench judge-sample`, label the new items.
+- [ ] **P16 live result rows:** `gh workflow run live.yml -f backend=mem0 -f pack=tool-call-memory` and `-f backend=all -f pack=tool-call-memory` (repeat for `customer-support-xl`); download each job's `results/` artifact, commit it, `membench leaderboard results/ --out results/README.md`; add the rows to `docs/comparison.md` and publish it (Done-when 2).
+- [ ] **P16 nightly smoke green 7 days:** after merge + secrets, `smoke.yml` runs nightly by itself; watch for 7 green nights (failures open an issue). Do not dispatch from here.
+- [ ] **P16 PyPI v0.2.0 (manual):** on pypi.org add a trusted publisher (repo `imthath-m/membench`, workflow `release.yml`, environment `pypi`); create the `pypi` environment in repo settings; then `git tag v0.2.0 && git push origin v0.2.0` from `main`. Not published from here.
+- [ ] **Known issue (P16 finding):** `contains_any` (staleness / forget compliance) is a case-insensitive substring match, so short values over-count (`Pro` matches "approved"); switch to word-boundary matching (changes those scores; regenerate fixture + results).
+
 | Phase | Branch | PR | Status |
 |---|---|---|---|
 | 8 | claude/gracious-edison-v8eyxs | #6 | done (live run blocked) |
@@ -11,7 +33,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 13 | claude/gracious-edison-v8eyxs-phase-13 | #11 | done (LLM-backed repeats blocked) |
 | 14 | claude/gracious-edison-v8eyxs-phase-14 | #12 | done (live vendor runs blocked) |
 | 15 | claude/gracious-edison-v8eyxs-phase-15 | #13 | done (human labels + cross-judge runs blocked) |
-| 16 | claude/gracious-edison-v8eyxs-phase-16 | — | in progress |
+| 16 | claude/gracious-edison-v8eyxs-phase-16 | — | done (live rows, 7-day smoke, PyPI publish blocked) |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -209,7 +231,7 @@ Status: done (with blocked items)
   - Panel: `configs/judges.yaml` = claude-sonnet-5 (Anthropic), gpt-4.1 (OpenAI; GPT-5 models reject temperature 0), meta-llama/Llama-3.3-70B-Instruct-Turbo (Together, OpenAI-compatible).
 
 ## Phase 16 — Results publishing + scheduled CI
-Status: in progress
+Status: done (with blocked items)
 - [x] `membench publish`: `results/<YYYY-MM-DD>/<dataset>/<backend>/` with `report.json`, the report's judge-cache entries, `uv.lock` hash
 - [x] Offline baseline results committed (full-context, bm25, chroma, oracle on synthetic packs; no judge)
 - [x] `membench leaderboard results/ --out results/README.md` (CI, n, cost per 1k queries, recall p95; grouped by judge model + prompt version; judge status; oracle = upper bound; default vs vendor-tuned rows)
@@ -220,4 +242,16 @@ Status: in progress
 - [x] CI: full benchmark runs manual dispatch only
 - [x] PyPI v0.2 release prep (metadata, tag/manual-gated trusted-publishing workflow; not published)
 - [x] README docs + tests
-- [ ] "Overall status" checklist of blocked items (Phases 8–16) at the top of this file
+- [x] "Overall status" checklist of blocked items (Phases 8–16) at the top of this file
+- [ ] Done-when: nightly smoke green 7 days — Blocked: needs the stack merged to `main` (schedules run on the default branch only) + secrets; then it runs by itself.
+- [ ] Done-when: write-up published — Blocked: draft `docs/comparison.md` has offline rows only; Mem0 + Phase 14 rows need the live runs (see Overall status).
+- [x] Done-when: `results/README.md` generated from committed reports and re-derived identically in CI (`ci.yml` `results` job; also `tests/test_publish_leaderboard.py`).
+- Blocked: PyPI publish — manual (trusted publisher + `pypi` environment, then tag `v0.2.0`); see Overall status.
+- Notes:
+  - Committed: `full-context`, `bm25`, `chroma`, `oracle` on `tool-call-memory` + `customer-support-xl` (seed 0, no judge, tiktoken), run from clean commit aa8a986; 3.9 MB total. Trimming: `publish` drops `traces[].detail.items[].text` (unused by scoring) and writes compact JSON; contexts kept so `rescore --check` is exact (all 8 verified).
+  - Not committed: LongMemEval / LoCoMo results. LongMemEval_S full-context is ~600 MB; LoCoMo allows ids only, which a re-scorable report can't be. `report --failures --excerpt-chars 0` gives an ids-only listing.
+  - `publish` refuses a report that doesn't re-score identically, and copies only the judge-cache entries the report reads (`RecordingCache`). `.gitignore` re-includes `results/**/report.json`. sdist excludes `results/`.
+  - `rescore` is always strict-cache (no `--strict-cache` flag added); the CI `results` job loops over `results/*/*/*/report.json`.
+  - Leaderboard: tables keyed by (date, dataset dir, judge model + prompt version, reader); judge status via `report_metric_status`; row label from `meta.json` `config` (`<backend> (vendor-tuned)`), `oracle *(upper bound)*` sorted last.
+  - Failure classes may overlap (a query can be both not retrieved and stale). Errored queries are counted, not classified.
+  - `smoke.yml`: nightly `17 3 * * *` (frozen lock) + weekly `41 4 * * 1` (`pip install --upgrade`, unpinned); missing secrets → backend skipped with a notice; scheduled failure → one issue per mode (comment if open). `live.yml` gained `config` input + `membench publish` + `results/` artifact (it is the manual-only full-run path).
