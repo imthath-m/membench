@@ -232,3 +232,59 @@ def test_run_unexpected_judge_response_shape_records_judge_error(monkeypatch, tm
     assert "KeyError" in errored["detail"]["judge_error"]["semantic_recall"]
     assert data["scores"]["semantic_recall"] == 0.0
     assert data["scores"]["contradiction_rate"] == 0.0
+
+
+def test_run_reader_without_key_warns_and_scores_null(monkeypatch, tmp_path):
+    monkeypatch.delenv("MEMBENCH_JUDGE_API_KEY", raising=False)
+    monkeypatch.delenv("MEMBENCH_READER_API_KEY", raising=False)
+    out_path = tmp_path / "report.json"
+
+    result = runner.invoke(
+        app, ["run", "--backend", "full-context", "--pack", "mini", "--no-judge",
+              "--reader-model", "claude-haiku-4-5", "--out", str(out_path)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Reader enabled but no API key" in result.output
+    data = json.loads(out_path.read_text())
+    assert data["manifest"]["reader"] is None
+    assert data["scores"]["qa_accuracy"] is None
+
+
+def test_run_reader_answers_and_is_judged(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEMBENCH_READER_API_KEY", "reader-key")
+    http = RubricRoutedHTTP([
+        ("CURRENT DATE", _openai("I don't know")),  # the reader abstains on everything
+        ("reference answer", _openai('{"verdict": "fail", "reason": "abstained"}')),
+        ("", _openai('{"verdict": "pass", "reason": "ok"}')),
+    ])
+    keys = []
+
+    def fake_resolve(model=None, base_url=None, api_key=None):
+        keys.append(api_key)
+        return OpenAICompatibleClient(api_key=api_key, model=model, base_url=base_url,
+                                      http_client=http)
+
+    monkeypatch.setattr(cli_module, "resolve_client", fake_resolve)
+    out_path = tmp_path / "report.json"
+    judge_client = OpenAICompatibleClient(
+        api_key="k", model="stub", base_url="https://gateway.example/v1", http_client=http
+    )
+    monkeypatch.setattr(
+        cli_module, "build_judge", lambda **kw: CachedJudge(judge_client, tmp_path / "c.json")
+    )
+
+    result = runner.invoke(
+        app, ["run", "--backend", "full-context", "--pack", "customer-support",
+              "--reader-model", "gpt-5-mini", "--reader-base-url", "https://gateway.example/v1",
+              "--out", str(out_path)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert keys == ["reader-key"]
+    data = json.loads(out_path.read_text())
+    assert data["manifest"]["reader"]["model"] == "gpt-5-mini"
+    assert data["scores"]["abstention"] == 1.0
+    assert data["scores"]["qa_accuracy"] == 0.0
+    assert data["by_category"]["temporal"]["qa_accuracy"] == 0.0
+    assert data["cost"]["reader"]["calls"] == 11

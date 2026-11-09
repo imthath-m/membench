@@ -156,3 +156,71 @@ def test_failed_reset_marks_the_episode_errored():
     assert all(t.error is None for t in result.traces[:2])
     assert all("reset before episode failed" in t.error for t in result.traces[2:])
     assert ("write", "e2") not in adapter.calls
+
+
+class StubReaderClient:
+    model = "claude-haiku-4-5"
+    base_url = None
+
+    def __init__(self, fail_on=None):
+        self.prompts: list[str] = []
+        self.fail_on = fail_on
+
+    def respond(self, prompt):
+        self.prompts.append(prompt)
+        if self.fail_on and self.fail_on in prompt:
+            raise RuntimeError("reader down")
+        return " the answer \n", {"input_tokens": 10, "output_tokens": 2}
+
+
+def test_reader_answers_queries_with_gold_or_abstain_only():
+    from membench.core.reader import Reader
+
+    client = StubReaderClient(fail_on="broken?")
+    pack = _pack([
+        _w("e1"),
+        {**_q("2025-05-01T00:00:00+00:00"), "query": "gold?", "answer": "x"},
+        {**_q(), "query": "abstain?", "abstain": True},
+        {**_q(), "query": "broken?", "answer": "x"},
+        _q(),  # no answer, no abstain: the reader is not asked
+    ])
+    reader = Reader(client)
+
+    result = run_pack(pack, RecordingAdapter(), backend_name="rec", reader=reader)
+
+    gold, abstain, broken, plain = result.traces[1:]
+    assert gold.detail["reader_answer"] == "the answer"
+    assert abstain.detail["reader_answer"] == "the answer"
+    assert broken.detail["reader_answer"] is None
+    assert broken.detail["reader_error"] == "RuntimeError: reader down"
+    assert "reader_answer" not in plain.detail
+    assert "CURRENT DATE: 2025-05-01T00:00:00+00:00" in client.prompts[0]
+    assert "x y" in client.prompts[0] and "gold?" in client.prompts[0]
+    assert result.manifest["reader"] == {
+        "model": "claude-haiku-4-5", "base_url": None, "prompt_version": "1",
+    }
+    assert result.cost["reader"]["calls"] == 3
+    assert result.cost["reader"]["input_tokens"] == 20  # the failed call reported no usage
+    assert result.cost["reader"]["usd"] == 20 * 1.0 / 1e6 + 4 * 5.0 / 1e6
+
+
+def test_ingest_tokens_exclude_tokens_spent_in_recall():
+    class Metered(RecordingAdapter):
+        tokens = 0
+
+        def write(self, event):
+            super().write(event)
+            self.tokens += 100  # extraction at write time
+
+        def recall(self, query, *, session_id, at):
+            self.tokens += 5  # query embedding
+            return super().recall(query, session_id=session_id, at=at)
+
+        def usage(self):
+            return {"llm_input_tokens": self.tokens}
+
+    pack = _pack([_w("e1"), _w("e2"), _q(), _q()])
+    result = run_pack(pack, Metered(), backend_name="rec")
+
+    assert result.usage == {"llm_input_tokens": 210}
+    assert result.cost["ingest_tokens_per_1k_writes"] == 200 / 2 * 1000

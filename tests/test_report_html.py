@@ -47,3 +47,12 @@ def test_multi_html_comparison_names_both_backends():
     assert "comparison" in html.lower()
     # still self-contained
     assert "src=" not in html and "<script" not in html.lower()
+
+
+def test_html_has_per_category_table():
+    report = _report()
+    report["by_category"] = {"temporal": {"n": 2, "recall_precision": 0.5}}
+    single = render_html([report])
+    assert "<h2>By category</h2>" in single
+    assert "<th>temporal</th>" in single and "50%" in single
+    assert "Recall precision by category" in render_html([report, report])
