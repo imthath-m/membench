@@ -6,6 +6,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 8 | claude/gracious-edison-v8eyxs | #6 | done (live run blocked) |
 | 9 | claude/gracious-edison-v8eyxs-phase-9 | #7 | done |
 | 10 | claude/gracious-edison-v8eyxs-phase-10 | #8 | done (cost-vs-dashboard blocked) |
+| 11 | claude/gracious-edison-v8eyxs-phase-11 | — | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -72,3 +73,20 @@ Status: done (with blocked items)
   - Judge: `JUDGE_PROMPT_VERSION = "1"` is in the cache key (`{model}:v1:{sha}`), so pre-Phase-10 caches are all misses. Clients have `respond(prompt) -> (text, {input_tokens, output_tokens})`; `CachedJudge` needs a client with `respond` (or `client=None` with `strict=True`). Cache entries: `{passed, reason, raw, usage}` or `{error, raw, usage}` — judge failures are now cached (changed from Phase 8) so a strict replay reproduces them; a non-strict run still re-asks the client. `CacheMissError` is not a `JudgeError`: it stops the run/rescore (CLI exit 1). `CachedJudge.usage` = {calls, cache_hits, input_tokens, output_tokens} for this run; cost counts fresh calls only (cached replay = $0).
   - `run_pack(..., seed=0, repeat=0)`; CLI `--seed`, `--repeat-index`, `--strict-cache`. Seeding = `random.seed` + numpy if already imported. Phase 13 repeats should pass `repeat`.
   - `uv.lock` (uv 0.11) covers all extras; CI `lock` job runs `uv lock --check`; `live.yml` installs via `uv sync --frozen --extra mem0` and runs `membench rescore --check` after the run. Run `uv lock` after any `pyproject.toml` dependency change.
+
+## Phase 11 — Metrics v2
+Status: in progress
+- [ ] Schema: query `category`, `answer`, `expect_absent`, `evidence`, `abstain`
+- [ ] Packs: realistic timestamps (days to months apart) + migrated to the new fields; test that every write/query sets `timestamp`
+- [ ] Temporal reasoning accuracy (`temporal` queries)
+- [ ] Staleness (post-update queries whose context still holds an `expect_absent` value)
+- [ ] Forget compliance (post-`forget` queries without the forgotten content)
+- [ ] Abstention (correct "not known" on `abstain: true` queries)
+- [ ] Evidence recall@k over `RecalledItem.event_ids`
+- [ ] QA accuracy: optional `--reader-model` reader stage, judged against `answer`; manifest/cost `reader`
+- [ ] Token cost: `membench[tokens]` (tiktoken `o200k_base`, vocab cached); whitespace fallback labelled `approx`; tokenizer name in report
+- [ ] Latency: `write` / `ingest` / `recall` p50/p95; p95 `n/a` below 100 samples
+- [ ] Cost: ingest tokens per 1k writes, USD per 1k queries
+- [ ] Per-category breakdown in md/html reports
+- [ ] Fixture-trace unit tests for each new metric; schema + fixture regenerated; README docs
+
