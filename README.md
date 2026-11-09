@@ -73,8 +73,11 @@ membench run --backend full-context --pack customer-support \
 ```
 
 Works with Anthropic, OpenAI, Gemini, or any OpenAI-compatible endpoint.
-Judge responses are cached on disk (`--judge-cache`) keyed by (model, prompt
-hash) so CI can replay scored runs without network access. Rate-limit (429)
+Judge responses are cached on disk (`--judge-cache`) keyed by (model,
+`JUDGE_PROMPT_VERSION`, prompt hash), with the raw reply and its token
+`usage`, so CI can replay scored runs without network access.
+`--strict-cache` judges from the cache only (no API key needed) and fails
+the run on a cache miss — use it to replay published results. Rate-limit (429)
 and 5xx responses are retried with exponential backoff, honouring
 `Retry-After`. Without an API
 key, `--judge` degrades gracefully: the two judge metrics score `null` and
@@ -173,6 +176,61 @@ Deterministic metrics (`recall_precision`, `update_correctness`,
 need `--judge` (default on) and `MEMBENCH_JUDGE_API_KEY`; with `--no-judge`
 or no key, they score `null`.
 
+### Reproducibility
+
+Every report carries a `manifest` and validates against
+[`membench/report.schema.json`](membench/report.schema.json):
+
+- `schema_version`; membench version, git commit and dirty flag; Python and OS.
+- Backend: name, config with secrets redacted (`api_key`, `token`, …), SDK
+  versions (`packages`), models and settings from `describe()` (LLM, base
+  URL, temperature, embedding model), deployment (`local`/`hosted`) and region.
+- Pack name and content sha256 (of the parsed YAML, so formatting doesn't
+  change it); dataset id/revision/sha256 (`null` until dataset loaders land).
+- Judge model, base URL and prompt version; reader (`null` until the reader
+  stage lands); tokenizer; `--seed`; `--repeat-index`; start/finish times.
+
+Re-score a report from its traces and the judge cache — no adapter, no
+network, no API key:
+
+```bash
+membench rescore --in report.json --judge-cache .membench_judge_cache.json --check
+```
+
+It reloads the pack (`--pack`, default: the manifest's pack name), refuses
+one whose sha256 differs from the run's, replays the judge with a strict
+cache, and prints whether the scores are identical (`--check` exits 1 if
+not; `--out` writes the re-scored report). CI re-scores a committed report
+(`tests/fixtures/`) on every push.
+
+Published runs are made from a frozen sync of `uv.lock`
+(`uv sync --frozen --extra mem0`, as `.github/workflows/live.yml` does);
+`pyproject.toml` keeps floor versions for library users.
+
+**Determinism.** `--seed` (default 0) seeds Python's `random` and numpy (when
+a backend loaded it). Deterministic: the pack, traces → scores (bit-identical
+on rescore), the judge cache, Chroma's local ONNX embedder
+(`all-MiniLM-L6-v2`). Not deterministic: backend LLM extraction (Mem0's LLM
+runs at its configured `temperature`, recorded in the manifest; OpenAI
+offers no hard seed guarantee), the judge on a cache miss (temperature 0 is
+not bit-stable across calls or model updates — the cache is what makes
+replays exact), approximate vector search ordering on near-ties, and latency.
+
+### Cost
+
+The report's `cost` section prices API-reported token counts against a dated
+table, [`membench/prices.yaml`](membench/prices.yaml) (USD per 1M tokens):
+
+- `judge`: this run's judge calls, cache hits and input/output tokens (cache
+  hits cost nothing; a fully cached replay reports `$0`).
+- `backend`: `adapter.usage()` (Mem0: fact-extraction LLM and embedding
+  tokens, counted from the OpenAI SDK's `usage`), priced by the models its
+  `describe()` names.
+- `reader`: `null` until the reader stage lands.
+- `total_usd` and `usd_per_1k_queries`. A model missing from the table gets
+  `usd: null`, and so does the total. Re-check the table against the
+  providers' pricing pages before publishing a cost.
+
 ## Writing a new adapter
 
 A backend adapter is a thin, stateless config wrapper — the runner owns
@@ -201,6 +259,8 @@ class RecallResult:
 
 class MemoryAdapter(ABC):
     retryable: tuple[type[BaseException], ...] = ()       # transient errors to retry
+    packages: tuple[str, ...] = ()                        # SDK dists recorded in the manifest
+    deployment: str = "local"                             # "local" | "hosted" (region: config)
     def __init__(self, config: dict | None = None): ...   # plain dict from pack/CLI config
     def write(self, event: Event) -> None: ...             # ingest one fact/turn/tool-result
     def recall(self, query: str, *, session_id: str, at: str) -> RecallResult: ...
@@ -208,6 +268,7 @@ class MemoryAdapter(ABC):
     def flush(self) -> None: ...                           # optional: wait for async ingest
     def reset(self) -> None: ...                           # optional: clear persisted state
     def usage(self) -> dict[str, int] | None: ...          # optional: backend LLM/embed tokens
+    def describe(self) -> dict | None: ...                 # optional: models + settings
 ```
 
 What the runner guarantees:
@@ -224,7 +285,12 @@ What the runner guarantees:
 - `reset()` runs before the run (unless `--no-reset`) and between a pack's
   episodes.
 - `usage()` (default `None`) is read once at the end and stored as the
-  report's `usage`.
+  report's `usage`. Keys: `llm_input_tokens`, `llm_output_tokens`,
+  `embedding_tokens`, priced against `describe()`'s `llm_model` /
+  `embedding_model` in the `cost` section. A backend calling an
+  `openai.OpenAI` client can hand it to `membench.core.usage.meter_openai`.
+- `describe()` (default `None`) names what shapes results (`llm_model`,
+  `llm_base_url`, `temperature`, `embedding_model`, …) for the manifest.
 - Map backend ids back to `Event.id` in `RecalledItem.event_ids`.
 
 `membench/adapters/mem0.py` is the worked example for a real (optional-extra)
@@ -236,6 +302,7 @@ from __future__ import annotations
 from typing import Any
 
 from membench.core.adapter import Event, MemoryAdapter, RecalledItem, RecallResult
+from membench.core.usage import meter_openai, new_usage
 
 try:
     from mem0 import Memory
@@ -256,6 +323,7 @@ class Mem0Adapter(MemoryAdapter):
     """Mem0 OSS baseline backend."""
 
     retryable = _RETRYABLE
+    packages = ("mem0ai", "openai")
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         if Memory is None:
@@ -270,6 +338,11 @@ class Mem0Adapter(MemoryAdapter):
         mem0_config = self.config.get("mem0_config")
         self._client = Memory.from_config(mem0_config) if mem0_config else Memory()
         self._sources: dict[str, list[str]] = {}  # mem0 memory id -> Event.ids
+        self._llm = getattr(self._client, "llm", None)
+        self._embedder = getattr(self._client, "embedding_model", None)
+        self._usage = new_usage()
+        for part in (self._llm, self._embedder):  # extraction + embedding tokens
+            meter_openai(getattr(part, "client", None), self._usage)
 
     def write(self, event: Event) -> None:
         result = self._client.add(event.content, user_id=self.user_id)
@@ -299,6 +372,19 @@ class Mem0Adapter(MemoryAdapter):
     def reset(self) -> None:
         self._client.delete_all(user_id=self.user_id)
         self._sources.clear()
+
+    def usage(self) -> dict[str, int]:
+        return dict(self._usage)
+
+    def describe(self) -> dict[str, Any]:
+        llm = getattr(self._llm, "config", None)
+        base_url = getattr(getattr(self._llm, "client", None), "base_url", None)
+        return {
+            "llm_model": getattr(llm, "model", None),
+            "llm_base_url": str(base_url) if base_url else None,
+            "temperature": getattr(llm, "temperature", None),
+            "embedding_model": getattr(getattr(self._embedder, "config", None), "model", None),
+        }
 ```
 
 Things to note from that example, which apply to any new adapter:
@@ -322,16 +408,23 @@ Things to note from that example, which apply to any new adapter:
    under `docs/` (see `docs/mem0.md`).
 
 That's the whole surface — `write`, `recall`, `forget`, a registry line, and
-an import guard. Override `flush()`, `reset()` and `usage()` when the backend
-needs them.
+an import guard. Override `flush()`, `reset()`, `usage()` and `describe()`
+when the backend needs them.
 
 ## Development
 
 ```bash
-pip install -e ".[dev,chroma]"
+pip install -e ".[dev,chroma]"   # or exact pins: uv sync --frozen --extra dev --extra chroma
 ruff check .
 pytest
 ```
+
+After changing dependencies in `pyproject.toml`, run `uv lock` (CI checks
+`uv lock --check`). After changing the report format, bump
+`REPORT_SCHEMA_VERSION` (`membench/core/manifest.py`), update
+`membench/report.schema.json`, and regenerate the committed fixture with
+`python tests/fixtures/make_report.py`. After changing the judge prompt or
+verdict parsing, bump `JUDGE_PROMPT_VERSION`.
 
 More docs: [docs/mem0.md](docs/mem0.md) (Mem0 backend config),
 [docs/generate.md](docs/generate.md) (transcript-to-pack generator).

@@ -59,7 +59,7 @@ Status: in progress
 - [x] Judge `--strict-cache` (cache miss is an error)
 - [x] `membench rescore --in report.json` (no adapter, no network)
 - [x] `uv.lock` + frozen sync for published (live) runs; floor versions kept
-- [ ] Cost tracking: judge / reader / backend tokens from API `usage`; dated price table → USD per run and per 1k queries (Mem0 `usage()`)
-- [ ] Determinism: seed, embedding model id + temperature recorded; non-determinism documented
+- [x] Cost tracking: judge / reader / backend tokens from API `usage`; dated price table → USD per run and per 1k queries (Mem0 `usage()`)
+- [x] Determinism: seed, embedding model id + temperature recorded; non-determinism documented
 - [x] Committed JSON Schema; every report validates (test)
 - [x] CI test: `rescore` on a committed report reproduces identical scores offline
