@@ -33,7 +33,7 @@ All code, tests, workflows and docs are in. What is left needs keys, people or a
 | 13 | claude/gracious-edison-v8eyxs-phase-13 | #11 | done (LLM-backed repeats blocked) |
 | 14 | claude/gracious-edison-v8eyxs-phase-14 | #12 | done (live vendor runs blocked) |
 | 15 | claude/gracious-edison-v8eyxs-phase-15 | #13 | done (human labels + cross-judge runs blocked) |
-| 16 | claude/gracious-edison-v8eyxs-phase-16 | — | done (live rows, 7-day smoke, PyPI publish blocked) |
+| 16 | claude/gracious-edison-v8eyxs-phase-16 | #14 | done (live rows, 7-day smoke, PyPI publish blocked) |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
