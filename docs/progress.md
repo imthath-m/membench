@@ -3,7 +3,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 
 | Phase | Branch | PR | Status |
 |---|---|---|---|
-| 8 | claude/gracious-edison-v8eyxs | — | in progress |
+| 8 | claude/gracious-edison-v8eyxs | #6 | done (live run blocked) |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
