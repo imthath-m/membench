@@ -255,3 +255,16 @@ Status: done (with blocked items)
   - Leaderboard: tables keyed by (date, dataset dir, judge model + prompt version, reader); judge status via `report_metric_status`; row label from `meta.json` `config` (`<backend> (vendor-tuned)`), `oracle *(upper bound)*` sorted last.
   - Failure classes may overlap (a query can be both not retrieved and stale). Errored queries are counted, not classified.
   - `smoke.yml`: nightly `17 3 * * *` (frozen lock) + weekly `41 4 * * 1` (`pip install --upgrade`, unpinned); missing secrets → backend skipped with a notice; scheduled failure → one issue per mode (comment if open). `live.yml` gained `config` input + `membench publish` + `results/` artifact (it is the manual-only full-run path).
+
+## Follow-up (post-Phase 16)
+Status: in progress
+- [ ] Regression test: `contains_any` must not match inside words ("Pro" vs "approved")
+- [ ] `contains_any` matches whole words/phrases (case-insensitive, regex-escaped, punctuation-safe); decision documented
+- [ ] Version decision recorded (no scoring version in the manifest)
+- [ ] Regenerate fixture report (`tests/fixtures/make_report.py`)
+- [ ] Re-score committed `results/` + re-derive `results/README.md`; update `docs/comparison.md` numbers
+- [ ] Remove the bug from known-issue lists
+- [ ] `docs/HANDOFF.md` (state, PR stack, keys & setup table, open-items runbook, caveats, agent conventions)
+- [ ] Root `CLAUDE.md` + README pointer; "Overall status" consistent with HANDOFF; no stale statements
+- [ ] Checks: pytest, ruff, `uv lock --check`, results rescore + leaderboard diff
+- [ ] PR opened; number recorded here and in HANDOFF
