@@ -13,5 +13,5 @@ Status: in progress
 - [x] Per-step error capture: trace `error`, run continues, report `error_rate`, run marked invalid above threshold
 - [x] Judge: unparseable reply retried once then `judge_error`; unexpected response shape → `judge_error`, no retry
 - [x] Tests: malformed judge reply (no JSON, bad JSON), unexpected shape (no `choices`), mem0 blocked import
-- [ ] CI: `chroma` job
-- [ ] CI: `live.yml` (manual dispatch, secret-gated) runs `mini` against `mem0` with judge
+- [x] CI: `chroma` job
+- [x] CI: `live.yml` (manual dispatch, secret-gated) runs `mini` against `mem0` with judge
