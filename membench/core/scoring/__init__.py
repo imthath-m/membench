@@ -10,6 +10,7 @@ per-category breakdown.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from membench.core.runner import StepTrace
@@ -81,13 +82,18 @@ class _MemoJudge:
     def __init__(self, judge: Judge) -> None:
         self.model = judge.model
         self._judge = judge
-        self._seen: dict[tuple[str, str], Verdict | JudgeError] = {}
+        self._seen: dict[tuple[str, ...], Verdict | JudgeError] = {}
 
     def score(self, rubric: str, evidence: str) -> Verdict:
-        key = (rubric, evidence)
+        return self._memo((rubric, evidence), lambda: self._judge.score(rubric, evidence))
+
+    def ask(self, prompt: str, parse: Callable[[str], Verdict]) -> Verdict:
+        return self._memo((prompt,), lambda: self._judge.ask(prompt, parse))
+
+    def _memo(self, key: tuple[str, ...], call: Callable[[], Verdict]) -> Verdict:
         if key not in self._seen:
             try:
-                self._seen[key] = self._judge.score(rubric, evidence)
+                self._seen[key] = call()
             except JudgeError as exc:
                 self._seen[key] = exc
         outcome = self._seen[key]
@@ -115,7 +121,10 @@ def score_all(
             i for i, s in enumerate(pack.steps)
             if not isinstance(s, QueryStep) or (s.category or "uncategorized") == category
         ]
-        sub_pack = Pack(pack.name, pack.description, [pack.steps[i] for i in keep], pack.sha256)
+        sub_pack = Pack(
+            pack.name, pack.description, [pack.steps[i] for i in keep], pack.sha256,
+            qa_style=pack.qa_style,
+        )
         sub_traces = [traces[i] for i in keep]
         by_category[category] = {
             "n": sum(isinstance(s, QueryStep) for s in sub_pack.steps),

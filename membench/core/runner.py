@@ -222,7 +222,7 @@ def run_pack(
                 if error is None:
                     try:
                         detail["reader_answer"] = reader.answer(
-                            step.query, result.context, step.timestamp
+                            step.query, result.context, step.timestamp, style=pack.qa_style
                         )
                     except Exception as exc:  # noqa: BLE001 - recorded, query not scored
                         detail["reader_error"] = f"{type(exc).__name__}: {exc}"

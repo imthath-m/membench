@@ -15,7 +15,8 @@ the runner calls `reset()` between episodes. Each step is one of:
     gold answer a reader's reply is judged against); `expect_absent` (stale or
     forgotten strings the context must not contain); `evidence` (ids of the
     earlier writes that answer it); `abstain: true` (no answer exists, the
-    reader should say it doesn't know).
+    reader should say it doesn't know; any `answer` it carries only explains
+    why, for judges that need it, e.g. LongMemEval's).
   - a `forget`: remove earlier writes by id (`target: <id or list of ids>`).
 """
 
@@ -23,7 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -99,12 +100,22 @@ class Pack:
 
     `sha256` hashes the parsed pack content (canonical JSON), so whitespace
     and comments don't change it; the run manifest records it.
+    `dataset` says how a loaded pack was built (`membench.datasets`: a pinned
+    download or the synthetic generator), `subset` how it was cut down
+    (`--limit` / `--sample`); both go in the manifest so `rescore` can rebuild
+    it. `qa_style` picks the reader and QA-judge prompts ("membench", or
+    "longmemeval" for the official ones). `flagged` holds the step indices of
+    queries on a dataset's exclusion list (scored with and without them).
     """
 
     name: str
     description: str
     steps: list[Step]
     sha256: str = ""
+    dataset: dict[str, Any] | None = None
+    subset: dict[str, Any] | None = None
+    qa_style: str = "membench"
+    flagged: list[int] = field(default_factory=list)
 
 
 def _require(d: dict, field_name: str, step_index: int) -> Any:
@@ -151,8 +162,6 @@ def _parse_step(raw: dict, index: int, episode: int) -> Step:
             episode=episode,
         )
     if step_type == "query":
-        if raw.get("abstain") and raw.get("answer") is not None:
-            raise PackValidationError(f"step {index}: an 'abstain' query has no 'answer'")
         return QueryStep(
             type="query",
             session_id=_require(raw, "session_id", index),
@@ -163,7 +172,7 @@ def _parse_step(raw: dict, index: int, episode: int) -> Step:
             judge=_parse_judge(raw.get("judge"), index),
             episode=episode,
             category=raw.get("category"),
-            answer=raw.get("answer"),
+            answer=None if raw.get("answer") is None else str(raw["answer"]),
             expect_absent=raw.get("expect_absent", []) or [],
             evidence=[str(e) for e in raw.get("evidence", []) or []],
             abstain=bool(raw.get("abstain", False)),
@@ -260,3 +269,21 @@ def builtin_pack_path(pack_name: str) -> Path:
     if not path.exists():
         raise PackValidationError(f"unknown builtin pack {pack_name!r} (no {path})")
     return path
+
+
+def pack_to_raw(pack: Pack) -> dict[str, Any]:
+    """The pack as a YAML-ready mapping (`episodes:` form), default fields left out."""
+    episodes: list[dict[str, Any]] = []
+    for step in pack.steps:
+        fields = asdict(step)
+        episode = fields.pop("episode")
+        if fields.get("judge"):
+            fields["judge"] = {k: v for k, v in fields["judge"].items() if v is not None}
+        if fields.get("fact_type") == "state":
+            del fields["fact_type"]
+        while len(episodes) <= episode:
+            episodes.append({"steps": []})
+        episodes[episode]["steps"].append(
+            {k: v for k, v in fields.items() if v not in (None, [], {}, False)}
+        )
+    return {"name": pack.name, "description": pack.description, "episodes": episodes}

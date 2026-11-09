@@ -36,9 +36,16 @@ class Reader:
         self.base_url = getattr(client, "base_url", None)
         self.usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0}
 
-    def answer(self, question: str, context: str, at: str) -> str:
+    def answer(self, question: str, context: str, at: str, style: str = "membench") -> str:
+        """`style` "longmemeval" uses LongMemEval's official reader prompt."""
+        if style == "longmemeval":
+            from membench.datasets.longmemeval import reader_prompt
+
+            prompt = reader_prompt(question, context, at)
+        else:
+            prompt = build_reader_prompt(question, context, at)
         self.usage["calls"] += 1
-        text, usage = self.client.respond(build_reader_prompt(question, context, at))
+        text, usage = self.client.respond(prompt)
         for name in ("input_tokens", "output_tokens"):
             self.usage[name] += usage.get(name, 0)
         if not isinstance(text, str):

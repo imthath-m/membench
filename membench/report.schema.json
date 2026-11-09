@@ -142,7 +142,16 @@
           "required": ["name", "sha256"],
           "properties": {
             "name": {"type": "string"},
-            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "subset": {
+              "type": ["object", "null"],
+              "properties": {
+                "limit": {"type": "integer", "minimum": 1},
+                "sample": {"type": "integer", "minimum": 1},
+                "sample_seed": {"type": "integer"}
+              }
+            },
+            "qa_style": {"enum": ["membench", "longmemeval"]}
           }
         },
         "dataset": {
@@ -151,7 +160,10 @@
           "properties": {
             "id": {"type": "string"},
             "revision": {"type": "string"},
-            "sha256": {"type": "string"}
+            "sha256": {"type": "string"},
+            "url": {"type": "string"},
+            "license": {"type": "string"},
+            "options": {"type": "object"}
           }
         },
         "judge": {"$ref": "#/$defs/llm_or_null"},

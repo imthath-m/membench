@@ -31,8 +31,10 @@ from membench.core.scoring.judge import (
     resolve_client,
 )
 from membench.core.tokens import default_tokenizer
+from membench.datasets import DATASETS, SYNTHETIC, resolve_pack, select_queries
 from membench.generate.generator import GenerationError, generate_pack
-from membench.packs.schema import PackValidationError, builtin_pack_path, load_pack
+from membench.generate.synthetic import paraphrase_queries
+from membench.packs.schema import PackValidationError, QueryStep, pack_to_raw
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -42,11 +44,29 @@ def main() -> None:
     """membench: eval harness for agent memory backends."""
 
 
-def _resolve_pack_path(pack: str) -> Path:
-    candidate = Path(pack)
-    if candidate.exists():
-        return candidate
-    return builtin_pack_path(pack)
+_PACK_HELP = (
+    "Pack: a YAML path, a bundled pack (e.g. 'mini'), a dataset "
+    f"({', '.join(DATASETS)}) or a synthetic pack ({', '.join(SYNTHETIC)})."
+)
+
+
+def _pack_options() -> dict:
+    """The `--pack` selection options shared by `run` and `convert`."""
+    return {
+        "pack_seed": typer.Option(0, "--pack-seed", help="Seed of a synthetic pack."),
+        "exclude_flagged": typer.Option(
+            False, "--exclude-flagged",
+            help="Drop queries on the dataset's exclusion list (e.g. LoCoMo).",
+        ),
+        "limit": typer.Option(None, "--limit", min=1, help="Keep only the first N queries."),
+        "sample": typer.Option(
+            None, "--sample", min=1,
+            help="Keep a random N queries, stratified by category (seeded by --seed).",
+        ),
+    }
+
+
+_OPT = _pack_options()
 
 
 def _load_backend_config(path: Path | None) -> dict:
@@ -66,9 +86,7 @@ def run(
     backend: str = typer.Option(
         ..., "--backend", help=f"Adapter to run against. One of: {list_backends()}"
     ),
-    pack: str = typer.Option(
-        ..., "--pack", help="Builtin pack name (e.g. 'mini') or path to a pack YAML file."
-    ),
+    pack: str = typer.Option(..., "--pack", help=_PACK_HELP),
     out: Path = typer.Option(
         Path("report.json"), "--out", help="Path to write the JSON report to."
     ),
@@ -112,6 +130,10 @@ def run(
         "Use to replay published results.",
     ),
     seed: int = typer.Option(0, "--seed", help="Seed for every seedable RNG (recorded)."),
+    pack_seed: int = _OPT["pack_seed"],
+    exclude_flagged: bool = _OPT["exclude_flagged"],
+    limit: int = _OPT["limit"],
+    sample: int = _OPT["sample"],
     repeat_index: int = typer.Option(
         0, "--repeat-index", help="Index of this run among repeats of the same config (recorded)."
     ),
@@ -129,8 +151,10 @@ def run(
 ) -> None:
     """Replay a scenario pack against a backend adapter and write a JSON report."""
     try:
-        pack_path = _resolve_pack_path(pack)
-        loaded_pack = load_pack(pack_path)
+        loaded_pack = resolve_pack(
+            pack, pack_seed=pack_seed, exclude_flagged=exclude_flagged, limit=limit,
+            sample=sample, sample_seed=seed,
+        )
         adapter_cls = get_adapter_class(backend)
         adapter_config = {"persist_dir": persist_dir, **_load_backend_config(backend_config)}
     except (
@@ -283,14 +307,26 @@ def rescore(
     check: bool = typer.Option(
         False, "--check", help="Exit 1 if the re-scored scores differ from the report's."
     ),
+    exclude_flagged: bool = typer.Option(
+        False, "--exclude-flagged",
+        help="Score without the dataset's flagged queries (shown as changes from the report).",
+    ),
 ) -> None:
-    """Recompute scores from a report's traces and the judge cache (no adapter, no network)."""
+    """Recompute scores from a report's traces and the judge cache (no adapter, no network).
+
+    A dataset pack is rebuilt from the manifest (`dataset` + `pack.subset`);
+    its cached download is needed, or network access to fetch it again.
+    """
     try:
         report_data = json.loads(in_path.read_text())
         manifest = report_data.get("manifest") or {}
         if "pack" not in manifest:
             raise ValueError(f"{in_path} has no run manifest (made before membench 0.2.x)")
-        loaded_pack = load_pack(_resolve_pack_path(pack or manifest["pack"]["name"]))
+        dataset = manifest.get("dataset") or {}
+        loaded_pack = resolve_pack(
+            pack or dataset.get("id") or manifest["pack"]["name"],
+            **dataset.get("options", {}), **(manifest["pack"].get("subset") or {}),
+        )
         if loaded_pack.sha256 != manifest["pack"]["sha256"]:
             raise ValueError(
                 f"pack {loaded_pack.name!r} content (sha256 {loaded_pack.sha256[:12]}…) differs "
@@ -309,6 +345,10 @@ def rescore(
                 cache_path=judge_cache, strict=True,
             )
         traces = [StepTrace(**t) for t in report_data["traces"]]
+        if exclude_flagged:  # score the same run without the flagged queries
+            queries = {i for i, s in enumerate(loaded_pack.steps) if isinstance(s, QueryStep)}
+            loaded_pack, kept = select_queries(loaded_pack, queries - set(loaded_pack.flagged))
+            traces = [traces[i] for i in kept]
         scores, by_category = score_all(loaded_pack, traces, judge_obj)
     except (
         PackValidationError, ValueError, TypeError, KeyError, OSError, CacheMissError,
@@ -326,6 +366,9 @@ def rescore(
         diffs["by_category"] = (report_data.get("by_category"), by_category)
     if out is not None:
         error_rate = scores["error_rate"]
+        if exclude_flagged:
+            report_data["manifest"]["pack"]["sha256"] = loaded_pack.sha256
+            report_data["manifest"]["dataset"]["options"]["exclude_flagged"] = True
         report_data.update(
             traces=[asdict(t) for t in traces],
             scores=scores,
@@ -348,11 +391,59 @@ def _builtin_pack_names() -> list[str]:
     return sorted(p.stem for p in packs_dir.glob("*.yaml"))
 
 
+@app.command()
+def convert(
+    pack: str = typer.Option(..., "--pack", help=_PACK_HELP),
+    out: Path = typer.Option(..., "--out", help="Path to write the pack YAML to."),
+    seed: int = typer.Option(0, "--seed", help="Seed for --sample."),
+    pack_seed: int = _OPT["pack_seed"],
+    exclude_flagged: bool = _OPT["exclude_flagged"],
+    limit: int = _OPT["limit"],
+    sample: int = _OPT["sample"],
+    paraphrase_model: str = typer.Option(
+        None, "--paraphrase-model",
+        help=f"Rewrite each query with this LLM to cut its word overlap with the answer "
+        f"(key: ${API_KEY_ENV}).",
+    ),
+    paraphrase_base_url: str = typer.Option(
+        None, "--paraphrase-base-url", help="OpenAI-compatible endpoint for --paraphrase-model."
+    ),
+) -> None:
+    """Write any pack (dataset, synthetic, bundled) as YAML, for local inspection.
+
+    Dataset licenses still apply: never commit or redistribute converted
+    dataset files (LoCoMo is CC BY-NC 4.0).
+    """
+    try:
+        loaded_pack = resolve_pack(
+            pack, pack_seed=pack_seed, exclude_flagged=exclude_flagged, limit=limit,
+            sample=sample, sample_seed=seed,
+        )
+    except (PackValidationError, ValueError, OSError, yaml.YAMLError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    raw = pack_to_raw(loaded_pack)
+    if paraphrase_model:
+        client = resolve_client(model=paraphrase_model, base_url=paraphrase_base_url)
+        if client is None:
+            typer.echo(f"Error: --paraphrase-model needs ${API_KEY_ENV}.", err=True)
+            raise typer.Exit(code=1)
+        raw = paraphrase_queries(raw, client)
+    out.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True))
+    typer.echo(f"Wrote pack {loaded_pack.name!r} to {out} (local inspection only)")
+
+
 @app.command(name="list")
 def list_() -> None:
-    """List available builtin packs and backend adapters."""
+    """List available packs (bundled, datasets, synthetic) and backend adapters."""
     typer.echo("Packs:")
     for name in _builtin_pack_names():
+        typer.echo(f"  {name}")
+    typer.echo("Datasets (downloaded on first use):")
+    for name in DATASETS:
+        typer.echo(f"  {name}")
+    typer.echo("Synthetic (generated, --pack-seed):")
+    for name in SYNTHETIC:
         typer.echo(f"  {name}")
     typer.echo("Backends:")
     for name in list_backends():
