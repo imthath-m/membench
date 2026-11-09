@@ -202,6 +202,9 @@ def run(
         repeats = 3 if uses_llm else 1
     results = []
     for i in range(repeats):
+        for llm in (judge_obj, reader):  # each repeat's cost counts its own calls only
+            if llm is not None:
+                llm.usage = dict.fromkeys(llm.usage, 0)
         config = dict(adapter_config)
         if repeats > 1:  # a new namespace per repeat
             config["namespace"] = f"{config.get('namespace', 'membench')}-r{repeat_index + i}"
