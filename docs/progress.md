@@ -75,18 +75,28 @@ Status: done (with blocked items)
   - `uv.lock` (uv 0.11) covers all extras; CI `lock` job runs `uv lock --check`; `live.yml` installs via `uv sync --frozen --extra mem0` and runs `membench rescore --check` after the run. Run `uv lock` after any `pyproject.toml` dependency change.
 
 ## Phase 11 — Metrics v2
-Status: in progress
-- [ ] Schema: query `category`, `answer`, `expect_absent`, `evidence`, `abstain`
-- [ ] Packs: realistic timestamps (days to months apart) + migrated to the new fields; test that every write/query sets `timestamp`
-- [ ] Temporal reasoning accuracy (`temporal` queries)
-- [ ] Staleness (post-update queries whose context still holds an `expect_absent` value)
-- [ ] Forget compliance (post-`forget` queries without the forgotten content)
-- [ ] Abstention (correct "not known" on `abstain: true` queries)
-- [ ] Evidence recall@k over `RecalledItem.event_ids`
-- [ ] QA accuracy: optional `--reader-model` reader stage, judged against `answer`; manifest/cost `reader`
-- [ ] Token cost: `membench[tokens]` (tiktoken `o200k_base`, vocab cached); whitespace fallback labelled `approx`; tokenizer name in report
-- [ ] Latency: `write` / `ingest` / `recall` p50/p95; p95 `n/a` below 100 samples
-- [ ] Cost: ingest tokens per 1k writes, USD per 1k queries
-- [ ] Per-category breakdown in md/html reports
-- [ ] Fixture-trace unit tests for each new metric; schema + fixture regenerated; README docs
-
+Status: done (with blocked items)
+- [x] Schema: query `category`, `answer`, `expect_absent`, `evidence`, `abstain`
+- [x] Packs: realistic timestamps (days to months apart) + migrated to the new fields; test that every write/query sets `timestamp`
+- [x] Temporal reasoning accuracy (`temporal` queries)
+- [x] Staleness (post-update queries whose context still holds an `expect_absent` value)
+- [x] Forget compliance (post-`forget` queries without the forgotten content)
+- [x] Abstention (correct "not known" on `abstain: true` queries)
+- [x] Evidence recall@k over `RecalledItem.event_ids`
+- [x] QA accuracy: optional `--reader-model` reader stage, judged against `answer`; manifest/cost `reader`
+- [x] Token cost: `membench[tokens]` (tiktoken `o200k_base`, vocab cached); whitespace fallback labelled `approx`; tokenizer name in report
+- [x] Latency: `write` / `ingest` / `recall` p50/p95; p95 `n/a` below 100 samples
+- [x] Cost: ingest tokens per 1k writes, USD per 1k queries
+- [x] Per-category breakdown in md/html reports
+- [x] Fixture-trace unit tests for each new metric; schema + fixture regenerated; README docs
+- Blocked: live QA accuracy / abstention numbers (reader + judge against real LLMs) — needs `MEMBENCH_JUDGE_API_KEY` (and `OPENAI_API_KEY` for Mem0). Covered here by stub clients only. Once secrets exist: `gh workflow run live.yml -f pack=customer-support -f reader_model=claude-haiku-4-5` (or locally `membench run --backend full-context --pack customer-support --reader-model claude-haiku-4-5`).
+- Notes for next phases:
+  - Report schema bumped to `REPORT_SCHEMA_VERSION = "2"` (breaking): `p95_latency_ms` replaced by `{write,ingest,recall}_{p50,p95}_ms` (p95 null below `MIN_P95_SAMPLES = 100`, forget latency no longer reported); new required score keys `staleness`, `temporal_accuracy`, `forget_compliance`, `evidence_recall_at_k`, `abstention`, `qa_accuracy`; new top-level `by_category` ({category: {n, recall_precision, evidence_recall_at_k, semantic_recall, qa_accuracy}}, "uncategorized" when unset); query trace `detail.category`, and `reader_answer` / `reader_error` when a reader ran; `cost.ingest_tokens_per_1k_writes`. v1 reports no longer validate (packs changed too, so they can't be rescored anyway).
+  - Decisions: `category` is a free string (no fixed enum). Staleness uses the same post-update rule as `update_correctness` (expect_key updated earlier in the episode) + `expect_absent`. Forget compliance scores only `category: forget` queries (schema requires an earlier forget in the episode); fails on an `expect_absent` string in context OR an item tracing to a forgotten event id. Temporal accuracy = `expect_contains` pass rate on `category: temporal` (deterministic); reader-based temporal QA is `by_category.temporal.qa_accuracy`. Evidence recall@k uses all returned items (k = backend's own top-k), not a fixed k. Abstention is deterministic on the stored reader answer (regex for "I don't know"/"unknown"/"not mentioned"), None without a reader. Failed recall = miss for qa/abstention; reader or judge error = skipped (recorded on the trace).
+  - Reader: `core/reader.py` (`Reader(client)`, `READER_PROMPT_VERSION = "1"`, prompt includes `CURRENT DATE: <at>`). Reuses judge clients via `resolve_client`; key `MEMBENCH_READER_API_KEY` else `MEMBENCH_JUDGE_API_KEY`. Reader answers are not cached (stored on traces, so `rescore` replays them). `run_pack(..., reader=)`; reader runs only on queries with `answer` or `abstain`. QA judging reuses the unchanged judge prompt (rubric from `qa_rubric(question, gold)`), so `JUDGE_PROMPT_VERSION` stays "1".
+  - `score_all(pack, traces, judge) -> (scores, by_category)` is what the runner and `rescore` call; it memoizes judge verdicts per (rubric, evidence) so the breakdown adds no judge calls. `rescore --check` also diffs `by_category`. `score_run` still returns the flat scores.
+  - Tokenizer: `run_pack` default is still `count_tokens` (whitespace, `name = "whitespace:approx"`); the CLI passes `default_tokenizer()` (tiktoken `o200k_base` when installed + vocab available, else whitespace). Manifest `tokenizer` = the callable's `name` attr. `TIKTOKEN_CACHE_DIR` defaults to `~/.cache/membench/tiktoken`. CI `chroma` job installs `tokens` and runs `tests/test_tokens.py`; `live.yml` syncs `--extra tokens` and gained a `reader_model` input.
+  - Ingest tokens: the runner reads `adapter.usage()` before/after each `recall()`; `ingest = total backend tokens - recall tokens`.
+  - Full-context context lines now carry the event timestamp (`[<ts>] [role] content`) so temporal questions are answerable from the log; Chroma/Mem0 contexts are unchanged (no dates), which `temporal_accuracy` exposes.
+  - Bundled packs: `mini` kept its 8-step shape (tests index into it). `customer_support` (22 steps, 11 queries) and `coding_assistant` (24 steps, 11 queries) gained temporal, abstention and forget queries (+ one forget step each). All writes have explicit ids. Pack sha256s changed.
+  - Phase 10's checklist still shows "`JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`" unticked, though its notes say it is done (code confirms: manifest `judge.prompt_version`, cache key `{model}:v1:{sha}`, entries hold `raw` + `usage`).

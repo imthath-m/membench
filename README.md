@@ -2,9 +2,11 @@
 
 An eval harness for agent memory backends. MemBench replays a scripted
 scenario ("pack") — facts stated, updated, contradicted, and queried across
-sessions — against a memory backend, then scores the result on six metrics:
-recall precision, update correctness, token cost, p95 latency, semantic
-recall, and contradiction rate.
+sessions — against a memory backend, then scores the result: recall
+precision, update correctness, staleness, temporal accuracy, forget
+compliance, evidence recall@k, abstention, semantic recall, contradiction
+rate, QA accuracy (optional reader stage), token cost and per-stage latency,
+overall and per query category.
 
 Everything runs offline except the optional LLM judge (provider-agnostic;
 Claude by default).
@@ -19,6 +21,7 @@ pip install "membench @ git+https://github.com/imthath-m/membench"
 # optional backends
 pip install "membench[chroma] @ git+https://github.com/imthath-m/membench"   # local vector-store baseline
 pip install "membench[mem0] @ git+https://github.com/imthath-m/membench"     # Mem0 OSS backend
+pip install "membench[tokens] @ git+https://github.com/imthath-m/membench"   # exact token counts (tiktoken)
 ```
 
 ## Quickstart
@@ -80,8 +83,24 @@ Judge responses are cached on disk (`--judge-cache`) keyed by (model,
 the run on a cache miss — use it to replay published results. Rate-limit (429)
 and 5xx responses are retried with exponential backoff, honouring
 `Retry-After`. Without an API
-key, `--judge` degrades gracefully: the two judge metrics score `null` and
+key, `--judge` degrades gracefully: the judge metrics score `null` and
 everything else still runs.
+
+### Reader stage (QA accuracy)
+
+`--reader-model` adds a reader: an LLM answers each query that has a gold
+`answer` (or `abstain: true`) from the recalled context and the query's
+date, and the judge compares its reply to `answer` (`qa_accuracy`, the
+number comparable to published LongMemEval / LoCoMo results). The reply is
+stored on the trace (`detail.reader_answer`), so `rescore` replays it
+offline. Same client config as the judge: `--reader-base-url` for an
+OpenAI-compatible endpoint (omit for Claude); key from
+`MEMBENCH_READER_API_KEY`, else `MEMBENCH_JUDGE_API_KEY`. Without a key the
+run warns and `qa_accuracy` / `abstention` score `null`.
+
+```bash
+membench run --backend mem0 --pack customer-support --reader-model claude-haiku-4-5
+```
 
 ### Backends
 
@@ -114,13 +133,21 @@ independent scenarios with a `reset()` between them. Step types:
   query: "What is my favorite color?"
   expect_contains: ["blue"]
   expect_key: fact_color
+  category: single_hop       # single_hop | multi_hop | temporal | update | abstention | forget | …
+  answer: "Blue"             # gold answer the reader's reply is judged against
+  expect_absent: ["green"]   # stale / forgotten strings the context must not contain
+  evidence: [color-1]        # ids of the earlier writes that answer it
+  # abstain: true            # no answer exists (no `answer`); the reader should say it doesn't know
 - type: forget               # adapter.forget([...]); targets earlier writes by id
   session_id: s1
   target: color-1            # an id or a list of ids
 ```
 
-Any step may set `timestamp` (ISO 8601); a query's timestamp is passed to
-`recall()` as `at`.
+Any step may set `timestamp` (ISO 8601; quote it in YAML); a query's
+timestamp is passed to `recall()` as `at`. Without one, steps default to one
+second apart from 2024-01-01; the bundled packs set realistic timestamps
+(days to months apart). A `category: forget` query must follow a forget
+step in its episode; `evidence` ids must be earlier writes in the episode.
 
 ### Failures during a run
 
@@ -143,8 +170,11 @@ A run never stops on a single bad step:
 
 ## Metric definitions
 
-All six, plus `error_rate`, appear in every JSON report's `scores` block; `null` means the
-pack (or the run config) didn't exercise that metric.
+All of these appear in every JSON report's `scores` block; `null` means the
+pack (or the run config) didn't exercise that metric. `by_category` repeats
+the query-level metrics (`n`, `recall_precision`, `evidence_recall_at_k`,
+`semantic_recall`, `qa_accuracy`) per query `category` ("uncategorized"
+when unset); `membench report` renders it as a table.
 
 - **`recall_precision`** — fraction of queries with an `expect_contains`
   assertion whose recalled context contains every expected substring
@@ -154,12 +184,34 @@ pack (or the run config) didn't exercise that metric.
   updated or contradicted, whose recalled context reflects the *new* value
   rather than the stale one. Measures whether the backend tracks fact
   supersession correctly.
+- **`staleness`** — of the post-update queries above that declare
+  `expect_absent`, the fraction whose context still contains a stale value.
+  Lower is better. Full-context passes `update_correctness` but scores 100%
+  here.
+- **`temporal_accuracy`** — fraction of `category: temporal` queries whose
+  context contains every `expect_contains` string (e.g. the value that held
+  at an earlier date, or the date a change happened).
+- **`forget_compliance`** — fraction of `category: forget` queries whose
+  context contains none of their `expect_absent` strings and whose recalled
+  items trace back to no forgotten event id.
+- **`evidence_recall_at_k`** — for queries with `evidence`, the mean
+  fraction of evidence event ids among the recalled items'
+  `event_ids` (k = the items the backend returned, its own top-k).
+- **`abstention`** *(reader)* — fraction of `abstain: true` queries where the
+  reader replied that it doesn't know.
+- **`qa_accuracy`** *(reader + judge)* — fraction of queries with a gold
+  `answer` whose reader reply the judge finds equivalent.
 - **`token_cost`** — mean `token_count` of the injected context across all
   query steps (the runner counts each `RecallResult.context`, i.e. exactly
-  what would be billed as prompt tokens). Lower is cheaper.
-- **`p95_latency_ms`** — 95th-percentile latency in milliseconds across every
-  successful step (write + query + forget), nearest-rank method. Captures tail latency, not just
-  the average.
+  what would be billed as prompt tokens). Lower is cheaper. `membench run`
+  counts with tiktoken `o200k_base` when `membench[tokens]` is installed
+  (vocab cached under `~/.cache/membench/tiktoken`), else a whitespace word
+  count; `manifest.tokenizer` names it (`tiktoken:o200k_base` or
+  `whitespace:approx`) and reports mark the latter `approx`.
+- **`write_p50_ms` / `write_p95_ms`, `ingest_p50_ms` / `ingest_p95_ms`,
+  `recall_p50_ms` / `recall_p95_ms`** — nearest-rank latency percentiles per
+  stage over successful steps: `write()`, `flush()` before a query (async
+  ingest), `recall()`. p95 is `null` (`n/a`) below 100 samples.
 - **`semantic_recall`** *(judge)* — fraction of queries with a
   `judge.semantic_recall` rubric where the judge agrees the recalled context
   semantically conveys the expected fact (catches paraphrase/rewording that
@@ -171,10 +223,10 @@ pack (or the run config) didn't exercise that metric.
 - **`error_rate`** — fraction of steps (write + query + forget) whose adapter call
   failed or timed out. Above 10% the run is marked `"valid": false`.
 
-Deterministic metrics (`recall_precision`, `update_correctness`,
-`token_cost`, `p95_latency_ms`) always run offline. The two judge metrics
-need `--judge` (default on) and `MEMBENCH_JUDGE_API_KEY`; with `--no-judge`
-or no key, they score `null`.
+Deterministic metrics (everything not marked judge or reader) always run
+offline. The judge metrics need `--judge` (default on) and
+`MEMBENCH_JUDGE_API_KEY`; with `--no-judge` or no key, they score `null`.
+`abstention` needs the reader; `qa_accuracy` needs both.
 
 ### Reproducibility
 
@@ -187,8 +239,9 @@ Every report carries a `manifest` and validates against
   URL, temperature, embedding model), deployment (`local`/`hosted`) and region.
 - Pack name and content sha256 (of the parsed YAML, so formatting doesn't
   change it); dataset id/revision/sha256 (`null` until dataset loaders land).
-- Judge model, base URL and prompt version; reader (`null` until the reader
-  stage lands); tokenizer; `--seed`; `--repeat-index`; start/finish times.
+- Judge model, base URL and prompt version; reader model, base URL and
+  prompt version (`null` without `--reader-model`); tokenizer name; `--seed`;
+  `--repeat-index`; start/finish times.
 
 Re-score a report from its traces and the judge cache — no adapter, no
 network, no API key:
@@ -226,7 +279,9 @@ table, [`membench/prices.yaml`](membench/prices.yaml) (USD per 1M tokens):
 - `backend`: `adapter.usage()` (Mem0: fact-extraction LLM and embedding
   tokens, counted from the OpenAI SDK's `usage`), priced by the models its
   `describe()` names.
-- `reader`: `null` until the reader stage lands.
+- `reader`: the reader's calls and input/output tokens (`null` without one).
+- `ingest_tokens_per_1k_writes`: backend tokens spent outside `recall()`
+  (extraction + embedding at write/flush time) per 1000 writes.
 - `total_usd` and `usd_per_1k_queries`. A model missing from the table gets
   `usd: null`, and so does the total. Re-check the table against the
   providers' pricing pages before publishing a cost.
