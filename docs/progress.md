@@ -6,7 +6,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 8 | claude/gracious-edison-v8eyxs | #6 | done (live run blocked) |
 | 9 | claude/gracious-edison-v8eyxs-phase-9 | #7 | done |
 | 10 | claude/gracious-edison-v8eyxs-phase-10 | #8 | done (cost-vs-dashboard blocked) |
-| 11 | claude/gracious-edison-v8eyxs-phase-11 | — | in progress |
+| 11 | claude/gracious-edison-v8eyxs-phase-11 | #9 | done (live reader run blocked) |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
