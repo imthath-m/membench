@@ -11,6 +11,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 13 | claude/gracious-edison-v8eyxs-phase-13 | #11 | done (LLM-backed repeats blocked) |
 | 14 | claude/gracious-edison-v8eyxs-phase-14 | #12 | done (live vendor runs blocked) |
 | 15 | claude/gracious-edison-v8eyxs-phase-15 | #13 | done (human labels + cross-judge runs blocked) |
+| 16 | claude/gracious-edison-v8eyxs-phase-16 | — | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -206,3 +207,17 @@ Status: done (with blocked items)
   - Reports: md/html mark judge metrics `(unvalidated)` / Note `unvalidated` unless validated; the JSON report is unchanged. Phase 16's leaderboard should reuse `core.validation.status.report_metric_status`.
   - Prompt policy is enforced by `tests/test_judge_validation.py::PROMPT_SHA256` (hash of `build_prompt`, `qa_rubric`, LongMemEval judge templates); `test_no_committed_validation_result_means_unvalidated` must be updated when a real agreement file is committed.
   - Panel: `configs/judges.yaml` = claude-sonnet-5 (Anthropic), gpt-4.1 (OpenAI; GPT-5 models reject temperature 0), meta-llama/Llama-3.3-70B-Instruct-Turbo (Together, OpenAI-compatible).
+
+## Phase 16 — Results publishing + scheduled CI
+Status: in progress
+- [ ] `membench publish`: `results/<YYYY-MM-DD>/<dataset>/<backend>/` with `report.json`, the report's judge-cache entries, `uv.lock` hash
+- [ ] Offline baseline results committed (full-context, bm25, chroma, oracle on synthetic packs; no judge)
+- [ ] `membench leaderboard results/ --out results/README.md` (CI, n, cost per 1k queries, recall p95; grouped by judge model + prompt version; judge status; oracle = upper bound; default vs vendor-tuned rows)
+- [ ] `membench report --failures` (not retrieved / stale surfaced / answered wrong / false abstention / forget violation; excerpt + evidence ids)
+- [ ] Comparison write-up draft (offline baselines; Mem0 + Phase 14 rows pending), every number linked
+- [ ] CI: per-PR offline rescore of `results/` (strict cache) + leaderboard re-derive diff
+- [ ] CI: nightly secret-gated smoke (opens issue on failure) + weekly canary on latest unpinned deps
+- [ ] CI: full benchmark runs manual dispatch only
+- [ ] PyPI v0.2 release prep (metadata, tag/manual-gated trusted-publishing workflow; not published)
+- [ ] README docs + tests
+- [ ] "Overall status" checklist of blocked items (Phases 8–16) at the top of this file
