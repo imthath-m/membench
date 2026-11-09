@@ -38,8 +38,26 @@ jobs:
           assert data['pack_name'] == 'customer_support'
           assert data['backend_name'] == 'full-context'
           assert data['scores']['recall_precision'] is not None
+          import jsonschema
+          jsonschema.validate(data, json.load(open('membench/report.schema.json')))
           print('offline example run produced a valid report')
           "
+
+      - name: Rescore committed report offline (no adapter, no network)
+        run: |
+          membench rescore --in tests/fixtures/report_customer_support.json \
+            --judge-cache tests/fixtures/judge_cache_customer_support.json --check
+
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: uv.lock is up to date with pyproject.toml
+        run: uv lock --check
 
   chroma:
     runs-on: ubuntu-latest
@@ -55,7 +73,9 @@ jobs:
         run: pip install -e ".[dev,chroma]"
 
       - name: Test chroma adapter
-        run: pytest tests/test_chroma_adapter.py tests/test_chroma_reset.py tests/test_adapter_contract.py -rs
+        run: |
+          pytest tests/test_chroma_adapter.py tests/test_chroma_reset.py tests/test_adapter_contract.py \
+            tests/test_report_schema.py -rs
 
       - name: Offline chroma example run (no judge, no API key)
         run: membench run --backend chroma --pack customer-support --no-judge --out report.json
