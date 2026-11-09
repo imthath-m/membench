@@ -1,10 +1,14 @@
 import json
+import sys
+from types import SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 import membench.cli as cli_module
 from membench.adapters.full_context import FullContextAdapter
 from membench.cli import app
+from membench.core.scoring.judge import CachedJudge, OpenAICompatibleClient
 
 runner = CliRunner()
 
@@ -108,3 +112,123 @@ def test_run_no_reset_skips_reset(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert _instances[0].reset_calls == 0
+
+
+# --- Phase 8: hardening -----------------------------------------------------
+
+def test_run_mem0_without_mem0ai_prints_one_line_error(monkeypatch, tmp_path):
+    # Block `import mem0` and force the adapter module to re-import under the block.
+    monkeypatch.setitem(sys.modules, "mem0", None)
+    monkeypatch.delitem(sys.modules, "membench.adapters.mem0", raising=False)
+    out_path = tmp_path / "report.json"
+
+    result = runner.invoke(
+        app, ["run", "--backend", "mem0", "--pack", "mini", "--no-judge", "--out", str(out_path)]
+    )
+
+    assert result.exit_code == 1
+    lines = result.output.strip().splitlines()
+    assert len(lines) == 1, result.output
+    assert lines[0].startswith("Error:")
+    assert "pip install membench[mem0]" in lines[0]
+    assert "Traceback" not in result.output
+    assert not out_path.exists()
+
+
+class ExplodingAdapter(FullContextAdapter):
+    """Raises on the second recall to simulate a backend failure mid-pack."""
+
+    def __init__(self, config=None):
+        super().__init__(config)
+        self.recalls = 0
+
+    def recall(self, query):
+        self.recalls += 1
+        if self.recalls == 2:
+            raise RuntimeError("backend exploded")
+        return super().recall(query)
+
+
+def test_run_forced_adapter_exception_still_writes_report(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_module, "get_adapter_class", lambda name: ExplodingAdapter)
+    out_path = tmp_path / "report.json"
+
+    result = runner.invoke(
+        app, ["run", "--backend", "stub", "--pack", "mini", "--no-judge", "--out", str(out_path)]
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(out_path.read_text())
+    errors = [t["error"] for t in data["traces"] if t["error"]]
+    assert errors == ["RuntimeError: backend exploded"]
+    assert data["scores"]["error_rate"] == 1 / 8
+    assert data["valid"] is False  # 12.5% is above the 10% threshold
+    assert "run is invalid" in result.output
+
+
+class RubricRoutedHTTP:
+    """Fake judge endpoint: replies by which rubric the prompt carries."""
+
+    def __init__(self, routes):
+        self.routes = routes  # list of (substring, body); first match wins
+
+    def post(self, url, headers=None, json=None):
+        prompt = json["messages"][0]["content"]
+        body = next(b for needle, b in self.routes if needle in prompt)
+        return SimpleNamespace(status_code=200, headers={}, json=lambda: body,
+                               raise_for_status=lambda: None)
+
+
+def _run_with_judge(monkeypatch, tmp_path, http):
+    client = OpenAICompatibleClient(
+        api_key="k", model="stub", base_url="https://gateway.example/v1", http_client=http
+    )
+    monkeypatch.setattr(
+        cli_module, "build_judge", lambda **kw: CachedJudge(client, tmp_path / "cache.json")
+    )
+    out_path = tmp_path / "report.json"
+    result = runner.invoke(
+        app, ["run", "--backend", "full-context", "--pack", "customer-support",
+              "--out", str(out_path)],
+    )
+    assert result.exit_code == 0, result.output
+    return json.loads(out_path.read_text())
+
+
+def _openai(text):
+    return {"choices": [{"message": {"content": text}}]}
+
+
+def _judged(data):
+    return [t for t in data["traces"] if t["step_type"] == "query" and "judge_error" in t["detail"]]
+
+
+@pytest.mark.parametrize("bad_reply", ["no json at all", '{"verdict": pass'])
+def test_run_malformed_judge_reply_records_judge_error(monkeypatch, tmp_path, bad_reply):
+    http = RubricRoutedHTTP([
+        ("correct order number is ORD-7788", _openai(bad_reply)),
+        ("", _openai('{"verdict": "pass", "reason": "ok"}')),
+    ])
+
+    data = _run_with_judge(monkeypatch, tmp_path, http)
+
+    [errored] = _judged(data)
+    assert errored["detail"]["query"] == "What is the customer's correct order number?"
+    assert set(errored["detail"]["judge_error"]) == {"semantic_recall"}
+    assert data["scores"]["semantic_recall"] == 1.0  # the other judged query still scores
+    assert data["scores"]["contradiction_rate"] == 1.0
+
+
+def test_run_unexpected_judge_response_shape_records_judge_error(monkeypatch, tmp_path):
+    http = RubricRoutedHTTP([
+        ("moved from the Basic plan", {"error": "no choices here"}),
+        ("", _openai('{"verdict": "fail", "reason": "no"}')),
+    ])
+
+    data = _run_with_judge(monkeypatch, tmp_path, http)
+
+    [errored] = _judged(data)
+    assert errored["detail"]["query"] == "Summarize the customer's plan history."
+    assert "KeyError" in errored["detail"]["judge_error"]["semantic_recall"]
+    assert data["scores"]["semantic_recall"] == 0.0
+    assert data["scores"]["contradiction_rate"] == 0.0
