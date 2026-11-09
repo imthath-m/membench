@@ -69,7 +69,7 @@ def test_queries_without_expect_contains_are_ignored():
 
 def test_write_steps_do_not_count():
     write = WriteStep(
-        type="write", session_id="s1", key="k", role="user", content="c", timestamp="t"
+        type="write", session_id="s1", id="e1", fact_key="k", role="user", content="c", timestamp="t"
     )
     pack = Pack(name="p", description="", steps=[write, _query("q1", ["blue"])])
     traces = [

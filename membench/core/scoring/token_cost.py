@@ -1,7 +1,7 @@
 """Token cost: average tokens injected into context per query recall.
 
-Reads `token_count` off each query step's trace (populated from
-`RecallResult.token_count` by the runner) rather than recomputing anything.
+Reads `token_count` off each query step's trace (the runner counts each
+recalled `context` with its configured tokenizer) rather than recomputing anything.
 """
 
 from __future__ import annotations

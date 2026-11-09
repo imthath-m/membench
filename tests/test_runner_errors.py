@@ -22,11 +22,11 @@ class FlakyAdapter(FullContextAdapter):
         super().__init__()
         self.fail_times = fail_times
 
-    def recall(self, query):
+    def recall(self, query, **kwargs):
         if self.fail_times:
             self.fail_times -= 1
             raise RateLimited("429 Too Many Requests")
-        return super().recall(query)
+        return super().recall(query, **kwargs)
 
 
 class BrokenRecallAdapter(FullContextAdapter):
@@ -37,17 +37,17 @@ class BrokenRecallAdapter(FullContextAdapter):
         self.fail_on = fail_on
         self.recalls = 0
 
-    def recall(self, query):
+    def recall(self, query, **kwargs):
         self.recalls += 1
         if self.recalls == self.fail_on:
             raise RuntimeError("backend exploded")
-        return super().recall(query)
+        return super().recall(query, **kwargs)
 
 
 class SlowAdapter(FullContextAdapter):
-    def recall(self, query):
+    def recall(self, query, **kwargs):
         time.sleep(0.5)
-        return super().recall(query)
+        return super().recall(query, **kwargs)
 
 
 @pytest.fixture

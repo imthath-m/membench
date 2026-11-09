@@ -10,28 +10,28 @@ steps:
   # --- Session d1: establish project conventions ---
   - type: write
     session_id: d1
-    key: conv_indent
+    fact_key: conv_indent
     role: user
     content: "For this project we use tabs for indentation, not spaces."
     fact_type: state
 
   - type: write
     session_id: d1
-    key: conv_api_url
+    fact_key: conv_api_url
     role: user
     content: "The API base URL for Atlas is https://api.atlas.dev/v1."
     fact_type: state
 
   - type: write
     session_id: d1
-    key: conv_orm
+    fact_key: conv_orm
     role: user
     content: "We use SQLAlchemy as the ORM for database access."
     fact_type: state
 
   - type: write
     session_id: d1
-    key: conv_test
+    fact_key: conv_test
     role: user
     content: "All new code must ship with pytest unit tests."
     fact_type: state
@@ -51,21 +51,21 @@ steps:
   # --- Session d2: decisions change (API URL update + ORM switch) ---
   - type: write
     session_id: d2
-    key: conv_api_url
+    fact_key: conv_api_url
     role: user
     content: "We migrated the API — the base URL is now https://api.atlas.io/v2."
     fact_type: update
 
   - type: write
     session_id: d2
-    key: conv_orm
+    fact_key: conv_orm
     role: user
     content: "Decision: we're switching from SQLAlchemy to Tortoise ORM for async support."
     fact_type: update
 
   - type: write
     session_id: d2
-    key: conv_lint
+    fact_key: conv_lint
     role: user
     content: "We now enforce ruff for linting on every commit."
     fact_type: state
@@ -90,14 +90,14 @@ steps:
   # --- Session d3: correct an earlier convention ---
   - type: write
     session_id: d3
-    key: conv_indent
+    fact_key: conv_indent
     role: user
     content: "Correction: we actually use 4 spaces for indentation, never tabs."
     fact_type: contradict
 
   - type: write
     session_id: d3
-    key: conv_pyver
+    fact_key: conv_pyver
     role: user
     content: "The project targets Python 3.11 as the minimum version."
     fact_type: state

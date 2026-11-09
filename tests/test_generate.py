@@ -19,13 +19,13 @@ description: Jamie's profile across two sessions.
 steps:
   - type: write
     session_id: s1
-    key: fact_name
+    fact_key: fact_name
     role: user
     content: "My name is Jamie Rivera."
     fact_type: state
   - type: write
     session_id: s1
-    key: fact_language
+    fact_key: fact_language
     role: user
     content: "My favorite programming language is Python."
     fact_type: state
@@ -36,13 +36,13 @@ steps:
     expect_key: fact_language
   - type: write
     session_id: s2
-    key: fact_name
+    fact_key: fact_name
     role: user
     content: "Actually I go by Jamie now, not James."
     fact_type: update
   - type: write
     session_id: s2
-    key: fact_language
+    fact_key: fact_language
     role: user
     content: "I was wrong earlier: my favorite language is actually Go, not Python."
     fact_type: contradict

@@ -1,8 +1,9 @@
-"""Adapter contract: MemoryAdapter ABC, Event, and RecallResult.
+"""Adapter contract v2: MemoryAdapter ABC, Event, RecalledItem, RecallResult.
 
 Adapters are thin, stateless config wrappers over a backend client. They
-only move data (write/recall/forget) — the runner owns timing, token
-accounting, and scoring.
+only move data (write/flush/recall/forget) — the runner owns timing, token
+accounting, and scoring. Adapters never see scoring ground truth: `Event.id`
+is an opaque per-write id, and the pack's fact keys stay with the scorer.
 """
 
 from __future__ import annotations
@@ -14,10 +15,15 @@ from typing import Any
 
 @dataclass
 class Event:
-    """One fact/turn/tool-result to be ingested by an adapter."""
+    """One fact/turn/tool-result to be ingested by an adapter.
 
+    `id` is unique per write (an update gets a new id) and is the only id an
+    adapter sees; `forget()` targets it and `RecalledItem.event_ids` maps back
+    to it.
+    """
+
+    id: str
     session_id: str
-    key: str
     role: str
     content: str
     timestamp: str
@@ -25,16 +31,27 @@ class Event:
 
 
 @dataclass
+class RecalledItem:
+    """One recalled unit, traced back to the `Event.id`s it came from.
+
+    `score` is the backend's relevance score (higher is better), or None.
+    """
+
+    event_ids: list[str]
+    text: str
+    score: float | None = None
+
+
+@dataclass
 class RecallResult:
     """What a `recall()` call returns.
 
-    `context` is exactly what would be injected into a prompt — this is
-    what the token-cost metric measures.
+    `context` is exactly what would be injected into a prompt — the runner
+    counts its tokens for the token-cost metric.
     """
 
     context: str
-    items: list[Any] = field(default_factory=list)
-    token_count: int = 0
+    items: list[RecalledItem] = field(default_factory=list)
 
 
 class MemoryAdapter(ABC):
@@ -55,12 +72,19 @@ class MemoryAdapter(ABC):
         """Ingest one fact/turn/tool-result."""
 
     @abstractmethod
-    def recall(self, query: str) -> RecallResult:
-        """Return injected context + items for a query."""
+    def recall(self, query: str, *, session_id: str, at: str) -> RecallResult:
+        """Return injected context + items for a query asked in `session_id` at time `at`."""
 
     @abstractmethod
-    def forget(self, key: str) -> None:
-        """Remove a previously written event by its stable key."""
+    def forget(self, event_ids: list[str]) -> None:
+        """Remove previously written events by their `Event.id`s."""
+
+    def flush(self) -> None:
+        """Block until async ingestion is done. Default: no-op (ingest is synchronous)."""
 
     def reset(self) -> None:
-        """Clear any state persisted by earlier runs. Default: no-op."""
+        """Clear any state persisted by earlier runs or episodes. Default: no-op."""
+
+    def usage(self) -> dict[str, int] | None:
+        """Cumulative backend LLM/embedding token counts, or None if not tracked."""
+        return None

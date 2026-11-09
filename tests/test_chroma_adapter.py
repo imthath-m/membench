@@ -7,10 +7,10 @@ chromadb = pytest.importorskip("chromadb", reason="chromadb not installed")
 from membench.adapters.chroma import ChromaAdapter
 
 
-def _event(key: str, content: str, session_id: str = "s1") -> Event:
+def _event(event_id: str, content: str, session_id: str = "s1") -> Event:
     return Event(
+        id=event_id,
         session_id=session_id,
-        key=key,
         role="user",
         content=content,
         timestamp="2024-01-01T00:00:00Z",
@@ -26,26 +26,24 @@ def test_write_and_recall_top_k(adapter):
     adapter.write(_event("k1", "My favorite color is blue."))
     adapter.write(_event("k2", "I live in Austin."))
 
-    result = adapter.recall("What is my favorite color?")
+    result = adapter.recall("What is my favorite color?", session_id="s1", at="2024-01-01T00:00:00Z")
 
     assert result.context != ""
-    assert result.token_count > 0
     assert len(result.items) <= 2
 
 
 def test_forget_removes_from_index(adapter):
     adapter.write(_event("k1", "My favorite color is blue."))
-    adapter.forget("k1")
+    adapter.forget(["k1"])
 
-    result = adapter.recall("favorite color")
+    result = adapter.recall("favorite color", session_id="s1", at="2024-01-01T00:00:00Z")
 
     assert result.context == ""
     assert result.items == []
 
 
 def test_recall_on_empty_adapter(adapter):
-    result = adapter.recall("anything")
+    result = adapter.recall("anything", session_id="s1", at="2024-01-01T00:00:00Z")
 
     assert result.context == ""
     assert result.items == []
-    assert result.token_count == 0

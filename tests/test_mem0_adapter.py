@@ -33,10 +33,10 @@ class FakeMem0Client:
         self._store = []
 
 
-def _event(key: str, content: str, session_id: str = "s1") -> Event:
+def _event(event_id: str, content: str, session_id: str = "s1") -> Event:
     return Event(
+        id=event_id,
         session_id=session_id,
-        key=key,
         role="user",
         content=content,
         timestamp="2024-01-01T00:00:00Z",
@@ -53,29 +53,27 @@ def test_write_and_recall(adapter):
     adapter.write(_event("k1", "My favorite color is blue."))
     adapter.write(_event("k2", "I live in Austin."))
 
-    result = adapter.recall("What is my favorite color?")
+    result = adapter.recall("What is my favorite color?", session_id="s1", at="2024-01-01T00:00:00Z")
 
     assert "blue" in result.context
-    assert result.token_count > 0
     assert len(result.items) <= 2
 
 
 def test_forget_removes_memory(adapter):
     adapter.write(_event("k1", "My favorite color is blue."))
-    adapter.forget("k1")
+    adapter.forget(["k1"])
 
-    result = adapter.recall("favorite color")
+    result = adapter.recall("favorite color", session_id="s1", at="2024-01-01T00:00:00Z")
 
     assert result.context == ""
     assert result.items == []
 
 
 def test_recall_on_empty_adapter(adapter):
-    result = adapter.recall("anything")
+    result = adapter.recall("anything", session_id="s1", at="2024-01-01T00:00:00Z")
 
     assert result.context == ""
     assert result.items == []
-    assert result.token_count == 0
 
 
 def test_reset_clears_memories_for_user_id(monkeypatch):
@@ -86,8 +84,8 @@ def test_reset_clears_memories_for_user_id(monkeypatch):
     adapter.reset()
 
     assert adapter._client.deleted_all_for == "run-42"
-    assert adapter.recall("favorite color").context == ""
-    assert adapter._ids == {}
+    assert adapter.recall("favorite color", session_id="s1", at="2024-01-01T00:00:00Z").context == ""
+    assert adapter._sources == {}
 
 
 def test_missing_install_raises_clear_error(monkeypatch):

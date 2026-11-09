@@ -7,8 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from membench.core.adapter import Event, MemoryAdapter, RecallResult
-from membench.core.tokens import count_tokens
+from membench.core.adapter import Event, MemoryAdapter, RecalledItem, RecallResult
 
 try:
     from mem0 import Memory
@@ -42,33 +41,33 @@ class Mem0Adapter(MemoryAdapter):
         self.top_k = int(self.config.get("top_k", 3))
         mem0_config = self.config.get("mem0_config")
         self._client = Memory.from_config(mem0_config) if mem0_config else Memory()
-        self._ids: dict[str, str] = {}
+        self._sources: dict[str, list[str]] = {}  # mem0 memory id -> Event.ids
 
     def write(self, event: Event) -> None:
-        result = self._client.add(
-            event.content, user_id=self.user_id, metadata={"key": event.key}
-        )
+        result = self._client.add(event.content, user_id=self.user_id)
         memories = result.get("results", []) if isinstance(result, dict) else result
-        if memories:
-            self._ids[event.key] = memories[0]["id"]
+        for memory in memories or []:  # one add may create or update several memories
+            self._sources.setdefault(memory["id"], []).append(event.id)
 
-    def recall(self, query: str) -> RecallResult:
+    def recall(self, query: str, *, session_id: str, at: str) -> RecallResult:
         result = self._client.search(
             query, filters={"user_id": self.user_id}, top_k=self.top_k
         )
         memories = result.get("results", []) if isinstance(result, dict) else result
-        context = "\n".join(m["memory"] for m in memories)
-        return RecallResult(
-            context=context,
-            items=memories,
-            token_count=count_tokens(context),
-        )
+        items = [
+            RecalledItem(self._sources.get(m["id"], []), m["memory"], m.get("score"))
+            for m in memories
+        ]
+        return RecallResult(context="\n".join(i.text for i in items), items=items)
 
-    def forget(self, key: str) -> None:
-        memory_id = self._ids.pop(key, None)
-        if memory_id is not None:
-            self._client.delete(memory_id)
+    def forget(self, event_ids: list[str]) -> None:
+        """Delete every memory derived from a target event."""
+        targets = set(event_ids)
+        for memory_id, sources in list(self._sources.items()):
+            if targets.intersection(sources):
+                self._client.delete(memory_id)
+                del self._sources[memory_id]
 
     def reset(self) -> None:
         self._client.delete_all(user_id=self.user_id)
-        self._ids.clear()
+        self._sources.clear()

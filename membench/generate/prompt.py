@@ -14,7 +14,7 @@ description: <one paragraph>
 steps:
   - type: write
     session_id: <string, groups steps into a conversation/session>
-    key: <stable id for this fact, reused when it is updated/contradicted>
+    fact_key: <stable name for this fact, reused when it is updated/contradicted>
     role: user | assistant
     content: <the fact as it was actually said>
     fact_type: state | update | contradict
@@ -22,15 +22,15 @@ steps:
     session_id: <string>
     query: <a question the agent should answer using memory>
     expect_contains: [<substrings that must appear in the recalled context>]
-    expect_key: <the key of the fact this query is testing>
+    expect_key: <the fact_key of the fact this query is testing>
 
 Rules:
 - Every fact worth remembering is a `write` step with `fact_type: state`
   the first time it's stated.
 - If a later message changes that fact, emit another `write` with the
-  same `key` and `fact_type: update` (a plain revision) or `fact_type:
+  same `fact_key` and `fact_type: update` (a plain revision) or `fact_type:
   contradict` (an explicit correction of earlier wrong info).
-- Every `query` step must reference a real `key` from an earlier `write`
+- Every `query` step must reference a real `fact_key` from an earlier `write`
   via `expect_key`, and `expect_contains` must list substrings that
   actually appear in the transcript for the *current* (post-update)
   value of that fact.

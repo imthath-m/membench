@@ -10,28 +10,28 @@ steps:
   # --- Ticket 1 (session t1): first contact, build the profile ---
   - type: write
     session_id: t1
-    key: fact_name
+    fact_key: fact_name
     role: user
     content: "Hi, my name is Dana Whitfield."
     fact_type: state
 
   - type: write
     session_id: t1
-    key: fact_email
+    fact_key: fact_email
     role: user
     content: "You can reach me at dana.whitfield@example.com."
     fact_type: state
 
   - type: write
     session_id: t1
-    key: fact_plan
+    fact_key: fact_plan
     role: user
     content: "I'm currently on the Basic plan."
     fact_type: state
 
   - type: write
     session_id: t1
-    key: fact_order
+    fact_key: fact_order
     role: user
     content: "I'm calling about order number ORD-4471."
     fact_type: state
@@ -51,21 +51,21 @@ steps:
   # --- Ticket 2 (session t2): plan upgrade + corrected order number ---
   - type: write
     session_id: t2
-    key: fact_plan
+    fact_key: fact_plan
     role: user
     content: "I'd like to upgrade to the Pro plan, effective today."
     fact_type: update
 
   - type: write
     session_id: t2
-    key: fact_address
+    fact_key: fact_address
     role: user
     content: "Please ship to 22 Elm Street, Portland, OR 97201."
     fact_type: state
 
   - type: write
     session_id: t2
-    key: fact_order
+    fact_key: fact_order
     role: user
     content: "Actually I gave the wrong number earlier — my order is ORD-7788, not ORD-4471."
     fact_type: contradict
@@ -90,14 +90,14 @@ steps:
   # --- Ticket 3 (session t3): shipping change + contact preference ---
   - type: write
     session_id: t3
-    key: fact_pref
+    fact_key: fact_pref
     role: user
     content: "Going forward I prefer to be contacted by email rather than phone."
     fact_type: state
 
   - type: write
     session_id: t3
-    key: fact_address
+    fact_key: fact_address
     role: user
     content: "I've moved — please update shipping to 90 Oak Avenue, Seattle, WA 98101."
     fact_type: update
