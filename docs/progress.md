@@ -11,7 +11,7 @@ Status: in progress
 - [x] `core/retry.py`: exponential backoff + jitter; adapters declare `retryable` exception tuple (Mem0: OpenAI rate limit / timeout)
 - [x] Per-step timeout `--step-timeout` (default 120s)
 - [x] Per-step error capture: trace `error`, run continues, report `error_rate`, run marked invalid above threshold
-- [ ] Judge: unparseable reply retried once then `judge_error`; unexpected response shape → `judge_error`, no retry
-- [ ] Tests: malformed judge reply (no JSON, bad JSON), unexpected shape (no `choices`), mem0 blocked import
+- [x] Judge: unparseable reply retried once then `judge_error`; unexpected response shape → `judge_error`, no retry
+- [x] Tests: malformed judge reply (no JSON, bad JSON), unexpected shape (no `choices`), mem0 blocked import
 - [ ] CI: `chroma` job
 - [ ] CI: `live.yml` (manual dispatch, secret-gated) runs `mini` against `mem0` with judge

@@ -6,6 +6,7 @@ from membench.core.scoring.judge import (
     AnthropicClient,
     CachedJudge,
     JudgeCache,
+    JudgeError,
     OpenAICompatibleClient,
     Verdict,
     build_judge,
@@ -178,6 +179,57 @@ def test_cache_roundtrips_and_second_lookup_skips_client(tmp_path):
 def test_cache_key_includes_model():
     prompt = build_prompt("r", "e")
     assert JudgeCache.key("model-a", prompt) != JudgeCache.key("model-b", prompt)
+
+
+# --- malformed replies / unexpected shapes -> JudgeError --------------------
+
+def _cached(tmp_path, http, openai=False):
+    if openai:
+        client = OpenAICompatibleClient(
+            api_key="k", model="gpt-x", base_url="https://gateway.example/v1", http_client=http
+        )
+    else:
+        client = AnthropicClient(api_key="k", http_client=http)
+    return CachedJudge(client, tmp_path / "cache.json")
+
+
+def test_unparseable_reply_is_retried_once_then_succeeds(tmp_path):
+    http = FakeHTTP(
+        _anthropic_body('{"verdict": "pass"}'),
+        responses=[FakeResponse(_anthropic_body("I think it passes."))],
+    )
+
+    assert _cached(tmp_path, http).score("r", "e").passed is True
+    assert len(http.calls) == 2
+
+
+@pytest.mark.parametrize("reply", ["no json here", '{"verdict": pass, }'])
+def test_unparseable_reply_twice_raises_judge_error_and_is_not_cached(tmp_path, reply):
+    http = FakeHTTP(_anthropic_body(reply))
+    judge = _cached(tmp_path, http)
+
+    with pytest.raises(JudgeError, match="failed to parse twice"):
+        judge.score("r", "e")
+    assert len(http.calls) == 2
+    assert not (tmp_path / "cache.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("body", "openai"),
+    [
+        ({"error": "no choices"}, True),  # KeyError
+        ({"choices": []}, True),  # IndexError
+        ({"choices": [{"message": {"content": None}}]}, True),  # TypeError
+        ({"content": []}, False),  # IndexError
+        (["not", "a", "dict"], False),  # TypeError
+    ],
+)
+def test_unexpected_response_shape_raises_judge_error_without_retry(tmp_path, body, openai):
+    http = FakeHTTP(body)
+
+    with pytest.raises(JudgeError, match="unexpected judge response shape"):
+        _cached(tmp_path, http, openai=openai).score("r", "e")
+    assert len(http.calls) == 1
 
 
 # --- build_judge ------------------------------------------------------------
