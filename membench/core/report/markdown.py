@@ -1,15 +1,21 @@
 """Render RunResult JSON report(s) as Markdown.
 
-Reports derive strictly from the JSON `scores` block and run metadata — no
-rescoring happens here (the runner is the source of truth). A single report
-becomes a scorecard table, a per-category table and a one-line-per-metric
+Reports derive strictly from the JSON `scores` / `stats` blocks and run
+metadata — no rescoring happens here (the runner is the source of truth). A
+single report becomes a scorecard table (value, 95% CI, n, and mean ± SD when
+the run was repeated), a per-category table and a one-line-per-metric
 breakdown; multiple reports become a side-by-side backend/pack comparison,
-one column each, plus recall precision by category.
+one column each, plus recall precision by category. A score whose n is below
+the minimum (see `core.stats`) is labelled `indicative`; p95 latency below
+100 samples is suppressed. For a paired significance test use `membench
+compare`.
 """
 
 from __future__ import annotations
 
 from membench.core.runner import MAX_ERROR_RATE
+from membench.core.scoring.latency import MIN_P95_SAMPLES
+from membench.core.stats import MIN_CATEGORY_N, MIN_HEADLINE_N
 
 # (key, human label, kind) — `kind` drives value formatting. `ratio` metrics
 # live in 0..1 and render as percentages; everything else is a plain number.
@@ -80,8 +86,8 @@ def _fmt_value(kind: str, value: object) -> str:
     return f"{float(value):.2f}"
 
 
-def _fmt_score(report: dict, key: str, kind: str) -> str:
-    """A score cell; token cost from the whitespace fallback is marked `approx`."""
+def _value(report: dict, key: str, kind: str) -> str:
+    """A score value; token cost from the whitespace fallback is marked `approx`."""
     text = _fmt_value(kind, report.get("scores", {}).get(key))
     tokenizer = str(report.get("manifest", {}).get("tokenizer", ""))
     if key == "token_cost" and text != "n/a" and "approx" in tokenizer:
@@ -89,12 +95,71 @@ def _fmt_score(report: dict, key: str, kind: str) -> str:
     return text
 
 
+def _stat(report: dict, key: str, category: str | None = None) -> dict | None:
+    stats = report.get("stats") or {}
+    if category is None:
+        return stats.get("scores", {}).get(key)
+    return stats.get("by_category", {}).get(category, {}).get(key)
+
+
+def _min_n(key: str, category: str | None = None) -> int:
+    if category is not None:
+        return MIN_CATEGORY_N
+    return MIN_P95_SAMPLES if key.endswith("_p95_ms") else MIN_HEADLINE_N
+
+
+def _fmt_ci(kind: str, stat: dict | None) -> str:
+    if not stat or stat.get("ci") is None:
+        return ""
+    low, high = stat["ci"]
+    if kind == "ratio":
+        return f"[{low * 100:.0f}–{high * 100:.0f}%]"
+    return f"[{low:.2f}–{high:.2f}]"
+
+
+def _note(stat: dict | None, min_n: int, value: object) -> str:
+    """`indicative` / `suppressed` label for a score below its minimum n."""
+    if not stat or not stat.get("indicative") or stat.get("n", 0) == 0:
+        return ""
+    return f"{'suppressed' if value is None else 'indicative'} (n < {min_n})"
+
+
+def _fmt_score(report: dict, key: str, kind: str) -> str:
+    """Compact cell: value, 95% CI, n and an indicative label (when stats exist)."""
+    return _cell(_value(report, key, kind), kind, _stat(report, key), _min_n(key),
+                 report.get("scores", {}).get(key))
+
+
+def _cell(text: str, kind: str, stat: dict | None, min_n: int, value: object) -> str:
+    if stat is None or value is None:
+        return text
+    parts = [text, _fmt_ci(kind, stat), f"n={stat['n']}"]
+    note = _note(stat, min_n, value)
+    if note:
+        parts.append("(indicative)")
+    return " ".join(p for p in parts if p)
+
+
+def _fmt_repeats(report: dict, key: str, kind: str) -> str:
+    entry = (report.get("repeat_summary") or {}).get("scores", {}).get(key) or {}
+    mean, sd = entry.get("mean"), entry.get("sd")
+    if mean is None or sd is None:
+        return "n/a"
+    if kind == "ratio":
+        return f"{mean * 100:.0f}% ± {sd * 100:.1f}pp"
+    return f"{mean:.2f} ± {sd:.2f}"
+
+
 def _categories(reports: list[dict]) -> list[str]:
     return sorted({c for r in reports for c in r.get("by_category", {})})
 
 
 def _category_cell(report: dict, category: str, key: str, kind: str) -> str:
-    return _fmt_value(kind, report.get("by_category", {}).get(category, {}).get(key))
+    value = report.get("by_category", {}).get(category, {}).get(key)
+    if key == "n":
+        return _fmt_value(kind, value)
+    return _cell(_fmt_value(kind, value), kind, _stat(report, key, category),
+                 MIN_CATEGORY_N, value)
 
 
 def _count_queries(report: dict) -> int:
@@ -131,14 +196,17 @@ def _render_single(report: dict) -> str:
         ),
         f"- **Valid:** {_fmt_valid(report)}",
         f"- **Tokenizer:** {report.get('manifest', {}).get('tokenizer', '?')}",
-        "",
-        "## Scores",
-        "",
-        "| Metric | Value |",
-        "| --- | --- |",
     ]
+    repeats = (report.get("repeat_summary") or {}).get("n")
+    if repeats:
+        lines.append(f"- **Repeats:** {repeats} (value / CI / n are from repeat 0)")
+    lines += ["", "## Scores", ""]
+    header = ["Metric", "Value", "95% CI", "n", "Note"]
+    if repeats:
+        header.append(f"Mean ± SD ({repeats} repeats)")
+    lines += ["| " + " | ".join(header) + " |", "|" + " --- |" * len(header)]
     for key, label, kind in _METRICS:
-        lines.append(f"| {label} | {_fmt_score(report, key, kind)} |")
+        lines.append("| " + " | ".join(_score_row(report, key, label, kind, repeats)) + " |")
 
     categories = _categories([report])
     if categories:
@@ -154,8 +222,31 @@ def _render_single(report: dict) -> str:
     lines += ["", "## Breakdown", ""]
     for key, label, _ in _METRICS:
         lines.append(f"- **{label}:** {_METRIC_NOTES[key]}")
-    lines.append("")
+    lines += ["", _STATS_NOTE, ""]
     return "\n".join(lines)
+
+
+_STATS_NOTE = (
+    "95% CIs: Wilson for pass/fail rates, seeded bootstrap over queries (10k resamples) "
+    f"otherwise. Indicative: n below {MIN_HEADLINE_N} overall, {MIN_CATEGORY_N} per "
+    f"category, or {MIN_P95_SAMPLES} samples for p95 latency (suppressed)."
+)
+
+
+def _score_row(report: dict, key: str, label: str, kind: str, repeats: int | None) -> list[str]:
+    """Metric | Value | 95% CI | n | Note [| Mean ± SD] cells of the scorecard."""
+    stat = _stat(report, key)
+    value = report.get("scores", {}).get(key)
+    cells = [
+        label,
+        _value(report, key, kind),
+        _fmt_ci(kind, stat) if value is not None else "",
+        str(stat["n"]) if stat else "",
+        _note(stat, _min_n(key), value),
+    ]
+    if repeats:
+        cells.append(_fmt_repeats(report, key, kind))
+    return cells
 
 
 def _render_comparison(reports: list[dict]) -> str:

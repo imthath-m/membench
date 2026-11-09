@@ -1,7 +1,7 @@
 """Render RunResult JSON report(s) as a self-contained HTML document.
 
-Like the Markdown emitter, this derives strictly from the JSON `scores`
-block and run metadata — no rescoring. The output is a single, fully
+Like the Markdown emitter, this derives strictly from the JSON `scores` /
+`stats` blocks and run metadata — no rescoring. The output is a single, fully
 self-contained page: inline `<style>` only, no external CDN / script / font
 links, so it opens offline anywhere. Reuses the metric spec and formatting
 from `markdown.py` to keep the two emitters in lockstep.
@@ -15,12 +15,14 @@ from membench.core.report.markdown import (
     _CATEGORY_METRICS,
     _METRIC_NOTES,
     _METRICS,
+    _STATS_NOTE,
     _categories,
     _category_cell,
     _count_queries,
     _fmt_score,
     _fmt_valid,
     _label,
+    _score_row,
 )
 
 _STYLE = """
@@ -85,18 +87,20 @@ def _render_single(report: dict) -> tuple[str, str]:
         f"({_count_queries(report)} queries)</li>"
         f"<li>Valid: {escape(_fmt_valid(report))}</li>"
         f"<li>Tokenizer: {escape(str(report.get('manifest', {}).get('tokenizer', '?')))}</li>"
-        "</ul>"
     )
+    repeats = (report.get("repeat_summary") or {}).get("n")
+    if repeats:
+        meta += f"<li>Repeats: {repeats} (value / CI / n are from repeat 0)</li>"
+    meta += "</ul>"
 
+    header = ["Metric", "Value", "95% CI", "n", "Note"]
+    if repeats:
+        header.append(f"Mean ± SD ({repeats} repeats)")
     rows = "".join(
-        _row(label, [_fmt_score(report, key, kind)])
+        _row(label, _score_row(report, key, label, kind, repeats)[1:])
         for key, label, kind in _METRICS
     )
-    table = (
-        "<table><thead><tr><th>Metric</th>"
-        "<th class=\"value\">Value</th></tr></thead>"
-        f"<tbody>{rows}</tbody></table>"
-    )
+    table = _table(header, rows)
 
     breakdown = "".join(
         f"<li><strong>{escape(label)}:</strong> {escape(_METRIC_NOTES[key])}</li>"
@@ -116,7 +120,7 @@ def _render_single(report: dict) -> tuple[str, str]:
     body = (
         f"<h1>{escape(title)}</h1>\n{meta}\n"
         f"<h2>Scores</h2>\n{table}\n{by_category}"
-        f"<h2>Breakdown</h2>\n<ul>{breakdown}</ul>"
+        f"<h2>Breakdown</h2>\n<ul>{breakdown}</ul>\n<p class=\"meta\">{escape(_STATS_NOTE)}</p>"
     )
     return title, body
 

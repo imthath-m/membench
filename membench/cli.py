@@ -12,6 +12,7 @@ import yaml
 
 from membench.core.reader import READER_API_KEY_ENV, Reader
 from membench.core.registry import get_adapter_class, list_backends
+from membench.core.report.compare import compare_reports, render_compare_markdown
 from membench.core.report.html import render_html
 from membench.core.report.json import write_json
 from membench.core.report.markdown import render_markdown
@@ -309,6 +310,34 @@ def report(
 
     out.write_text(renderer(reports))
     typer.echo(f"Wrote {format} report from {len(reports)} run(s) to {out}")
+
+
+@app.command()
+def compare(
+    a_path: Path = typer.Option(..., "--a", help="JSON report of run A (the baseline)."),
+    b_path: Path = typer.Option(..., "--b", help="JSON report of run B, on the same pack."),
+    out: Path = typer.Option(
+        None, "--out", help="Write here (.json for the raw rows, else Markdown); default stdout."
+    ),
+) -> None:
+    """Paired comparison of two runs on the same queries: B − A with a paired bootstrap CI,
+    McNemar's test for pass/fail metrics and Holm's correction across metrics × categories."""
+    try:
+        comparison = compare_reports(
+            json.loads(a_path.read_text()), json.loads(b_path.read_text())
+        )
+    except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    if out is not None and out.suffix == ".json":
+        out.write_text(json.dumps(comparison, indent=2))
+    else:
+        text = render_compare_markdown(comparison)
+        if out is None:
+            typer.echo(text)
+            return
+        out.write_text(text)
+    typer.echo(f"Wrote comparison of {comparison['a']} vs {comparison['b']} to {out}")
 
 
 @app.command()
