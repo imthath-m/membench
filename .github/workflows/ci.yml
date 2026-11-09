@@ -40,3 +40,22 @@ jobs:
           assert data['scores']['recall_precision'] is not None
           print('offline example run produced a valid report')
           "
+
+  chroma:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install membench (dev + chroma extras)
+        run: pip install -e ".[dev,chroma]"
+
+      - name: Test chroma adapter
+        run: pytest tests/test_chroma_adapter.py tests/test_chroma_reset.py -rs
+
+      - name: Offline chroma example run (no judge, no API key)
+        run: membench run --backend chroma --pack customer-support --no-judge --out report.json

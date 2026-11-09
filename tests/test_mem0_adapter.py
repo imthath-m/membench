@@ -100,3 +100,9 @@ def test_missing_install_raises_clear_error(monkeypatch):
 def test_adapter_under_100_lines():
     line_count = len(Path(mem0_module.__file__).read_text().splitlines())
     assert line_count < 100
+
+
+def test_mem0_declares_openai_rate_limit_and_timeout_retryable():
+    openai = pytest.importorskip("openai")
+    assert openai.RateLimitError in mem0_module.Mem0Adapter.retryable
+    assert openai.APITimeoutError in mem0_module.Mem0Adapter.retryable
