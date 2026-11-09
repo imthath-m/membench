@@ -11,6 +11,10 @@ builds one episode per simulated user, each with the same query mix:
   - `abstention`: a fact never stated (`abstain: true`).
   - `forget`: a fact the user asked to delete (a `forget` step), then asked about.
 
+Every answerable query carries a `semantic_recall` judge rubric and every
+`update` query a `contradiction` rubric, so the judge metrics (and their
+validation sample, Phase 15) have hundreds of items per pack.
+
 Facts are spread over `sessions` sessions `gap_days` apart, mixed with
 `distractors` filler turns per session; every query comes after the last
 session. Output is a raw pack mapping (validated by `parse_pack`), identical
@@ -30,7 +34,7 @@ from typing import Any
 
 from membench.generate.domains import DOMAINS, Domain
 
-GENERATOR_VERSION = "1"
+GENERATOR_VERSION = "2"
 _EPOCH = datetime(2025, 1, 6, tzinfo=timezone.utc)
 
 
@@ -92,9 +96,12 @@ def _episode(e: int, rng: random.Random, domain: Domain, knobs: Knobs) -> dict[s
     ids = [ep.fact(s, (chain.state if i == 0 else chain.update).format(v=v), chain.key,
                    "state" if i == 0 else "update")
            for i, (s, v) in enumerate(zip(sessions, values))]
+    contradiction = (f"The evidence names more than one current {chain.label} (among "
+                     f"{', '.join(values)}) without indicating which one superseded the others.")
     queries.append({"category": "update", "query": chain.question,
                     "expect_contains": [values[-1]], "expect_key": f"e{e}-{chain.key}",
-                    "expect_absent": values[:-1], "answer": values[-1], "evidence": [ids[-1]]})
+                    "expect_absent": values[:-1], "answer": values[-1], "evidence": [ids[-1]],
+                    "judge": {"contradiction": contradiction}})
 
     old, new = rng.sample(past.values, 2)
     before = rng.randrange(knobs.sessions - 1)
@@ -142,6 +149,10 @@ def _episode(e: int, rng: random.Random, domain: Domain, knobs: Knobs) -> dict[s
         date=_day(session_days[temporal.pop("_asof")] + timedelta(days=1))
     )
     for q, query in enumerate(queries):
+        if "answer" in query:  # judge rubric for semantic_recall
+            query.setdefault("judge", {})["semantic_recall"] = (
+                f"The evidence indicates that the answer to {query['query']!r} is {query['answer']}."
+            )
         steps.append({"type": "query", "session_id": f"e{e}-q",
                       "timestamp": (asked + timedelta(minutes=q)).isoformat(), **query})
     return {"steps": steps}

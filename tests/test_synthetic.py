@@ -107,3 +107,12 @@ def test_paraphrase_rewrites_queries_with_their_evidence():
     hop = next(p for p, q in zip(client.prompts, queries) if q["category"] == "multi_hop")
     assert hop.count("\n", hop.index("TEXT:")) >= 2  # both evidence turns
     parse_pack(raw)
+
+
+@pytest.mark.parametrize("name", sorted(DOMAINS))
+def test_judge_rubrics_on_answerable_and_update_queries(name):
+    queries = [s for s in parse_pack(generate(name)).steps if isinstance(s, QueryStep)]
+    for q in queries:
+        assert bool(q.judge and q.judge.semantic_recall) == (q.answer is not None)
+        assert bool(q.judge and q.judge.contradiction) == (q.category == "update")
+    assert sum(q.answer is not None for q in queries) >= 100
