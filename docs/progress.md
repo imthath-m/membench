@@ -9,7 +9,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 11 | claude/gracious-edison-v8eyxs-phase-11 | #9 | done (live reader run blocked) |
 | 12 | claude/gracious-edison-v8eyxs-phase-12 | #10 | done (oracle ±3pp + LoCoMo human audit blocked) |
 | 13 | claude/gracious-edison-v8eyxs-phase-13 | #11 | done (LLM-backed repeats blocked) |
-| 14 | claude/gracious-edison-v8eyxs-phase-14 | — | in progress |
+| 14 | claude/gracious-edison-v8eyxs-phase-14 | — | done (live vendor runs blocked) |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -153,18 +153,31 @@ Status: done (with blocked items)
   - `membench report --in a --in b` (side by side) cells now read "72% [65–78%] n=40 (indicative)" when stats exist.
 
 ## Phase 14 — Backend coverage
-Status: in progress
+Status: done (with blocked items)
 - [x] Shared adapter contract test suite (write → flush → recall finds it; forget removes it; reset empties; episode isolation)
 - [x] `bm25` baseline (lexical floor, offline)
 - [x] `oracle` baseline (only the query's `evidence` events; reader upper bound)
-- [ ] Mem0 Platform (`MemoryClient`; `flush()` polls async ingestion; namespace per episode)
-- [ ] Zep Cloud (user graph; graph search; `flush()` waits for ingestion; `at` via bi-temporal facts)
-- [ ] Letta archival passages + core blocks; separate `letta-agent` (agent-managed memory via messages)
-- [ ] LangMem (memory-store manager over a LangGraph `BaseStore`; recall `store.search`)
-- [ ] Cognee (`add` / `flush()` → `cognify` / `search` / `reset()` prunes; async wrapped)
-- [ ] Per backend: optional extra, import guard, `docs/<backend>.md`, mocked unit tests, gated live test
+- [x] Mem0 Platform (`MemoryClient`; `flush()` polls async ingestion; namespace per episode)
+- [x] Zep Cloud (user graph; graph search; `flush()` waits for ingestion; `at` via bi-temporal facts)
+- [x] Letta archival passages + core blocks; separate `letta-agent` (agent-managed memory via messages)
+- [x] LangMem (memory-store manager over a LangGraph `BaseStore`; recall `store.search`)
+- [x] Cognee (`add` / `flush()` → `cognify` / `search` / `reset()` prunes; async wrapped)
+- [x] Per backend: optional extra, import guard, `docs/<backend>.md`, mocked unit tests, gated live test
 - [x] `live.yml`: matrix over the hosted backends (secret-gated, manual dispatch)
-- [ ] Vendor review: draft issue text + default / vendor-tuned config slots (`docs/vendor-review.md`)
-- [ ] README + registry + `uv.lock`
-- [ ] Done-when: all 5 run `mini` live via `live.yml`
+- [x] Vendor review: draft issue text + default / vendor-tuned config slots (`docs/vendor-review.md`)
+- [x] README + registry + `uv.lock`
+- [ ] Done-when: all 5 run `mini` live via `live.yml` — Blocked (keys)
+- [x] Done-when: every adapter file < 100 lines (test); each adapter passes the shared contract suite (offline adapters for real, vendor adapters on SDK fakes)
+- Blocked: live `mini` on the 5 hosted backends (+ `letta-agent`) — needs repo secrets `MEM0_API_KEY`, `ZEP_API_KEY`, `LETTA_API_KEY`, `OPENAI_API_KEY` (LangMem; also passed to Cognee as `LLM_API_KEY`) and `MEMBENCH_JUDGE_API_KEY`. Once set: `gh workflow run live.yml -f backend=all -f pack=mini` (or one backend: `-f backend=zep`). Each matrix job first runs the gated contract test (`MEMBENCH_LIVE=1 pytest "tests/test_live_backends.py::test_live_mini_runs_clean[<backend>]"`), then `membench run ... --judge`, `rescore --check`, md report. Locally: `MEMBENCH_LIVE=1 ZEP_API_KEY=... pytest tests/test_live_backends.py -k zep -rs`.
+- Manual step (user): open the 5 vendor review issues drafted in `docs/vendor-review.md` (mem0ai/mem0, getzep/zep, letta-ai/letta, langchain-ai/langmem, topoteretes/cognee), then put the issue URLs in its table. Not opened from here by design.
+- Notes for next phases:
+  - New backends: `bm25`, `oracle`, `mem0-platform`, `zep`, `letta`, `letta-agent`, `langmem`, `cognee` (extras `mem0-platform`, `zep`, `letta`, `langmem`, `cognee`; `letta-agent` uses `letta`). SDK APIs were checked against the installed PyPI packages (mem0ai 2.2.1, zep-cloud 4.1.0, letta-client 1.12.1, langmem 0.0.30 / langgraph 1.2, cognee 1.6.7) and, for mem0-platform / zep / letta / letta-agent, driven end to end through the real SDK clients over an httpx mock transport (request paths + bodies checked); langmem ran through real `create_memory_store_manager` + `InMemoryStore` with a local fake chat model / embedder; cognee's `add` / `forget` / `prune` ran for real (local stores), `cognify` / `search` only signature-bound (they need an LLM / embedder). Floors: `zep-cloud>=4.1` (v4 API: everything is addressed by user/graph uuid), `letta-client>=1.12`, `langmem>=0.0.30`, `cognee>=1.6`.
+  - Contract: new class attr `MemoryAdapter.sees_evidence` (False); only `oracle` sets it, and the runner then sets `adapter.evidence = step.evidence` right before each recall. Context of the oracle = full-context line format.
+  - Shared poller `core/poll.py`: `drain(pending_ids, done, interval_s, timeout_s)` + `poll_options(config)` (keys `poll_interval_s` 1.0, `flush_timeout_s` 600). Used by mem0-platform (event ids) and zep (task uuids). A failed job raises once and is dropped. `flush_timeout_s` is longer than the default `--step-timeout` 120s: raise `--step-timeout` for slow ingestion.
+  - Episode isolation: every vendor adapter moves to a new scope on `reset()` (`<namespace>-e<n>`: mem0-platform user_id, zep user metadata label / new user, letta agent name, langmem namespace, cognee dataset), so the CLI's initial reset makes the first episode `-e1`. Repeats keep `membench-r<i>` as the namespace prefix.
+  - Event-id traceability: mem0-platform via memory `metadata.membench_event_id`; zep via edge `episode_uuids`; letta via passage ids; langmem via keys the manager put; cognee via chunk `document_id` (= data id; `CHUNKS` search only). `letta-agent` items carry no ids (agent's own notes), so its `evidence_recall_at_k` reads 0 — not meaningful; same for cognee with a non-CHUNKS `search_type`.
+  - Usage/cost: `letta-agent` (response `usage`) and `langmem` (LangChain `UsageMetadataCallbackHandler`, chat tokens only) report `usage()`; mem0-platform, zep, letta, cognee do not (cost.backend null). `cost._usd` now also prices provider-prefixed handles (`openai:gpt-4o-mini`, `openai/gpt-4o-mini`) as the bare id.
+  - Default configs live in `configs/default/<backend>.yaml` (a test checks they equal the adapter defaults); vendor-tuned go in `configs/vendor-tuned/` once vendors reply. Phase 16 publishing should show both rows, labelled.
+  - Decisions: Cognee recall defaults to `CHUNKS` (traceable) rather than a graph completion type; Zep recall is `graph.search_edges` with a `valid_at <= at` filter (context block not used); Letta archival agents are created with empty `human` / `persona` blocks and `openai/gpt-4o-mini` / `openai/text-embedding-3-small` handles; Graphiti (self-hosted Zep) is documented, not implemented. Cognee's `reset()` prunes the whole local Cognee install (roadmap wording); Cognee picks up AWS env credentials and then needs `s3fs`.
+  - Tests: `tests/test_contract_suite.py` (FACTORIES covers every registered backend; a test fails if a backend is registered without one), `tests/vendor_fakes.py` (SDK fakes with async-ingestion semantics: a missing flush fails), `tests/test_vendor_adapters.py`, `tests/test_baselines.py`, `tests/test_live_backends.py` (skipped unless `MEMBENCH_LIVE=1` + keys). CI `chroma` job also runs the contract suite with real chromadb.
 

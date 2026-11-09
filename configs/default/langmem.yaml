@@ -1,0 +1,6 @@
+# Default (untuned) LangMem config, labelled "default" in published results.
+# Equal to the adapter's built-in defaults; models read OPENAI_API_KEY.
+top_k: 3
+model: openai:gpt-4o-mini
+embedding: openai:text-embedding-3-small
+dims: 1536
