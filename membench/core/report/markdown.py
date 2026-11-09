@@ -2,8 +2,9 @@
 
 Reports derive strictly from the JSON `scores` block and run metadata — no
 rescoring happens here (the runner is the source of truth). A single report
-becomes a scorecard table plus a one-line-per-metric breakdown; multiple
-reports become a side-by-side backend/pack comparison, one column each.
+becomes a scorecard table, a per-category table and a one-line-per-metric
+breakdown; multiple reports become a side-by-side backend/pack comparison,
+one column each, plus recall precision by category.
 """
 
 from __future__ import annotations
@@ -15,20 +16,43 @@ from membench.core.runner import MAX_ERROR_RATE
 _METRICS: list[tuple[str, str, str]] = [
     ("recall_precision", "Recall precision", "ratio"),
     ("update_correctness", "Update correctness", "ratio"),
+    ("staleness", "Staleness", "ratio"),
+    ("temporal_accuracy", "Temporal accuracy", "ratio"),
+    ("forget_compliance", "Forget compliance", "ratio"),
+    ("evidence_recall_at_k", "Evidence recall@k", "ratio"),
+    ("abstention", "Abstention", "ratio"),
     ("semantic_recall", "Semantic recall", "ratio"),
     ("contradiction_rate", "Contradiction rate", "ratio"),
+    ("qa_accuracy", "QA accuracy", "ratio"),
     ("token_cost", "Token cost (avg tokens/query)", "number"),
-    ("p95_latency_ms", "p95 latency (ms)", "number"),
+    ("write_p50_ms", "Write p50 (ms)", "number"),
+    ("write_p95_ms", "Write p95 (ms)", "number"),
+    ("ingest_p50_ms", "Ingest p50 (ms)", "number"),
+    ("ingest_p95_ms", "Ingest p95 (ms)", "number"),
+    ("recall_p50_ms", "Recall p50 (ms)", "number"),
+    ("recall_p95_ms", "Recall p95 (ms)", "number"),
     ("error_rate", "Error rate", "ratio"),
 ]
 
+_P95_NOTE = "95th percentile in milliseconds (n/a below 100 samples)"
 _METRIC_NOTES: dict[str, str] = {
     "recall_precision": "fraction of expect_contains queries whose recall matched",
     "update_correctness": "fraction of post-update queries reflecting the new fact",
+    "staleness": "fraction of post-update queries still recalling a stale value (lower is better)",
+    "temporal_accuracy": "fraction of temporal queries whose recall matched",
+    "forget_compliance": "fraction of post-forget queries free of the forgotten content",
+    "evidence_recall_at_k": "fraction of evidence writes among the recalled items",
+    "abstention": "fraction of unanswerable queries the reader declined (n/a without reader)",
     "semantic_recall": "judge score for semantic recall (n/a when judge is off)",
     "contradiction_rate": "judge rate of contradictions in recall (n/a when judge is off)",
-    "token_cost": "mean recalled-context tokens per query",
-    "p95_latency_ms": "95th-percentile per-step latency in milliseconds",
+    "qa_accuracy": "judge score of reader answers vs gold (n/a without reader + judge)",
+    "token_cost": "mean recalled-context tokens per query (`approx`: whitespace count)",
+    "write_p50_ms": "median write latency in milliseconds",
+    "write_p95_ms": _P95_NOTE,
+    "ingest_p50_ms": "median flush (async ingest) latency before a query, in milliseconds",
+    "ingest_p95_ms": _P95_NOTE,
+    "recall_p50_ms": "median recall latency in milliseconds",
+    "recall_p95_ms": _P95_NOTE,
     "error_rate": (
         "fraction of steps that failed or timed out "
         f"(run invalid above {MAX_ERROR_RATE:.0%})"
@@ -36,12 +60,41 @@ _METRIC_NOTES: dict[str, str] = {
 }
 
 
+# (key, label, kind) columns of the per-category table.
+_CATEGORY_METRICS: list[tuple[str, str, str]] = [
+    ("n", "Queries", "count"),
+    ("recall_precision", "Recall precision", "ratio"),
+    ("evidence_recall_at_k", "Evidence recall@k", "ratio"),
+    ("semantic_recall", "Semantic recall", "ratio"),
+    ("qa_accuracy", "QA accuracy", "ratio"),
+]
+
+
 def _fmt_value(kind: str, value: object) -> str:
     if value is None:
         return "n/a"
     if kind == "ratio":
         return f"{float(value) * 100:.0f}%"
+    if kind == "count":
+        return str(value)
     return f"{float(value):.2f}"
+
+
+def _fmt_score(report: dict, key: str, kind: str) -> str:
+    """A score cell; token cost from the whitespace fallback is marked `approx`."""
+    text = _fmt_value(kind, report.get("scores", {}).get(key))
+    tokenizer = str(report.get("manifest", {}).get("tokenizer", ""))
+    if key == "token_cost" and text != "n/a" and "approx" in tokenizer:
+        text += " (approx)"
+    return text
+
+
+def _categories(reports: list[dict]) -> list[str]:
+    return sorted({c for r in reports for c in r.get("by_category", {})})
+
+
+def _category_cell(report: dict, category: str, key: str, kind: str) -> str:
+    return _fmt_value(kind, report.get("by_category", {}).get(category, {}).get(key))
 
 
 def _count_queries(report: dict) -> int:
@@ -66,7 +119,6 @@ def render_markdown(reports: list[dict]) -> str:
 
 
 def _render_single(report: dict) -> str:
-    scores = report.get("scores", {})
     lines = [
         f"# MemBench scorecard: {report.get('pack_name', '?')}",
         "",
@@ -78,6 +130,7 @@ def _render_single(report: dict) -> str:
             f"({_count_queries(report)} queries)"
         ),
         f"- **Valid:** {_fmt_valid(report)}",
+        f"- **Tokenizer:** {report.get('manifest', {}).get('tokenizer', '?')}",
         "",
         "## Scores",
         "",
@@ -85,7 +138,18 @@ def _render_single(report: dict) -> str:
         "| --- | --- |",
     ]
     for key, label, kind in _METRICS:
-        lines.append(f"| {label} | {_fmt_value(kind, scores.get(key))} |")
+        lines.append(f"| {label} | {_fmt_score(report, key, kind)} |")
+
+    categories = _categories([report])
+    if categories:
+        lines += [
+            "", "## By category", "",
+            "| Category | " + " | ".join(label for _, label, _ in _CATEGORY_METRICS) + " |",
+            "| --- | " + " | ".join("---" for _ in _CATEGORY_METRICS) + " |",
+        ]
+        for category in categories:
+            cells = [_category_cell(report, category, k, kind) for k, _, kind in _CATEGORY_METRICS]
+            lines.append(f"| {category} | " + " | ".join(cells) + " |")
 
     lines += ["", "## Breakdown", ""]
     for key, label, _ in _METRICS:
@@ -109,8 +173,19 @@ def _render_comparison(reports: list[dict]) -> str:
         "| --- | " + " | ".join("---" for _ in labels) + " |",
     ]
     for key, label, kind in _METRICS:
-        cells = [_fmt_value(kind, r.get("scores", {}).get(key)) for r in reports]
+        cells = [_fmt_score(r, key, kind) for r in reports]
         lines.append(f"| {label} | " + " | ".join(cells) + " |")
+
+    categories = _categories(reports)
+    if categories:
+        lines += [
+            "", "## Recall precision by category", "",
+            "| Category | " + " | ".join(labels) + " |",
+            "| --- | " + " | ".join("---" for _ in labels) + " |",
+        ]
+        for category in categories:
+            cells = [_category_cell(r, category, "recall_precision", "ratio") for r in reports]
+            lines.append(f"| {category} | " + " | ".join(cells) + " |")
 
     lines += ["", "## Runs", ""]
     for r in reports:

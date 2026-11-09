@@ -1,4 +1,4 @@
-"""Baseline adapter: append every event, recall returns the whole log."""
+"""Baseline adapter: append every event, recall returns the whole timestamped log."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ class FullContextAdapter(MemoryAdapter):
         self._events.append(event)
 
     def recall(self, query: str, *, session_id: str, at: str) -> RecallResult:
-        lines = [f"[{e.role}] {e.content}" for e in self._events]
+        lines = [f"[{e.timestamp}] [{e.role}] {e.content}" for e in self._events]
         return RecallResult(
             context="\n".join(lines),
             items=[RecalledItem(event_ids=[e.id], text=e.content) for e in self._events],

@@ -3,8 +3,10 @@
 `membench/prices.yaml` holds USD per 1M tokens per model and an `as_of` date.
 The judge's counts come from its client calls this run (cache hits are free),
 the backend's from `adapter.usage()` priced against the models its
-`describe()` names. A component whose model is missing from the table gets
-`usd: None`, and so does the total.
+`describe()` names, the reader's from its client calls. A component whose
+model is missing from the table gets `usd: None`, and so does the total.
+`ingest_tokens_per_1k_writes` is the backend's tokens spent outside
+`recall()` (extraction + embedding at write/flush time) per 1000 writes.
 """
 
 from __future__ import annotations
@@ -41,6 +43,10 @@ def compute_cost(
     backend_models: dict[str, Any] | None,
     backend_usage: dict[str, int] | None,
     n_queries: int,
+    n_writes: int = 0,
+    recall_tokens: int = 0,
+    reader_model: str | None = None,
+    reader_usage: dict[str, int] | None = None,
     prices: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The report's `cost` section (USD per run and per 1k queries)."""
@@ -51,7 +57,13 @@ def compute_cost(
         judge["usd"] = _usd(
             prices, judge_model, judge_usage["input_tokens"], judge_usage["output_tokens"]
         )
-    backend = None
+    reader = None
+    if reader_usage is not None:
+        reader = {"model": reader_model, **reader_usage}
+        reader["usd"] = _usd(
+            prices, reader_model, reader_usage["input_tokens"], reader_usage["output_tokens"]
+        )
+    backend, ingest_per_1k = None, None
     if backend_usage is not None:
         models = backend_models or {}
         backend = {
@@ -64,12 +76,15 @@ def compute_cost(
                  backend_usage.get("llm_output_tokens", 0)),
             _usd(prices, backend["embedding_model"], backend_usage.get("embedding_tokens", 0)),
         ])
-    total = _sum([part["usd"] for part in (judge, backend) if part is not None])
+        if n_writes:
+            ingest_per_1k = (sum(backend_usage.values()) - recall_tokens) / n_writes * 1000
+    total = _sum([part["usd"] for part in (judge, reader, backend) if part is not None])
     return {
         "price_table_as_of": prices["as_of"],
         "judge": judge,
-        "reader": None,  # the reader stage arrives in Phase 11
+        "reader": reader,
         "backend": backend,
+        "ingest_tokens_per_1k_writes": ingest_per_1k,
         "total_usd": total,
         "usd_per_1k_queries": total / n_queries * 1000 if total is not None and n_queries else None,
     }

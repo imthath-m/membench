@@ -19,10 +19,11 @@ from typing import Any
 
 import membench
 from membench.core.adapter import MemoryAdapter
+from membench.core.reader import READER_PROMPT_VERSION
 from membench.core.scoring.judge import JUDGE_PROMPT_VERSION
 from membench.packs.schema import Pack
 
-REPORT_SCHEMA_VERSION = "1"
+REPORT_SCHEMA_VERSION = "2"
 _SECRET_KEY = re.compile(r"(key|secret|password|passwd|credential|token|auth)$")
 
 
@@ -91,6 +92,7 @@ def build_manifest(
     repeat: int,
     started_at: str,
     finished_at: str,
+    reader: Any = None,
 ) -> dict[str, Any]:
     judge_info = None
     if judge is not None:
@@ -98,6 +100,13 @@ def build_manifest(
             "model": judge.model,
             "base_url": getattr(judge, "base_url", None),
             "prompt_version": JUDGE_PROMPT_VERSION,
+        }
+    reader_info = None
+    if reader is not None:
+        reader_info = {
+            "model": reader.model,
+            "base_url": reader.base_url,
+            "prompt_version": READER_PROMPT_VERSION,
         }
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -115,8 +124,8 @@ def build_manifest(
         "pack": {"name": pack.name, "sha256": pack.sha256},
         "dataset": None,  # {id, revision, sha256} once dataset loaders exist (Phase 12)
         "judge": judge_info,
-        "reader": None,  # the reader stage arrives in Phase 11
-        "tokenizer": _name(tokenizer),
+        "reader": reader_info,
+        "tokenizer": getattr(tokenizer, "name", None) or _name(tokenizer),
         "seed": seed,
         "repeat": repeat,
         "started_at": started_at,

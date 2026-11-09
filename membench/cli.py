@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 
 import typer
 import yaml
 
+from membench.core.reader import READER_API_KEY_ENV, Reader
 from membench.core.registry import get_adapter_class, list_backends
 from membench.core.report.html import render_html
 from membench.core.report.json import write_json
@@ -19,7 +21,7 @@ from membench.core.runner import (
     StepTrace,
     run_pack,
 )
-from membench.core.scoring import score_run
+from membench.core.scoring import score_all
 from membench.core.scoring.judge import (
     API_KEY_ENV,
     DEFAULT_JUDGE_MODEL,
@@ -28,6 +30,7 @@ from membench.core.scoring.judge import (
     build_judge,
     resolve_client,
 )
+from membench.core.tokens import default_tokenizer
 from membench.generate.generator import GenerationError, generate_pack
 from membench.packs.schema import PackValidationError, builtin_pack_path, load_pack
 
@@ -112,6 +115,17 @@ def run(
     repeat_index: int = typer.Option(
         0, "--repeat-index", help="Index of this run among repeats of the same config (recorded)."
     ),
+    reader_model: str = typer.Option(
+        None,
+        "--reader-model",
+        help="Enable the reader stage: this model answers each query from the recalled "
+        f"context (qa_accuracy, abstention). Key: ${READER_API_KEY_ENV} or ${API_KEY_ENV}.",
+    ),
+    reader_base_url: str = typer.Option(
+        None,
+        "--reader-base-url",
+        help="OpenAI-compatible endpoint for the reader; omit for Anthropic/Claude.",
+    ),
 ) -> None:
     """Replay a scenario pack against a backend adapter and write a JSON report."""
     try:
@@ -138,6 +152,21 @@ def run(
                 err=True,
             )
 
+    reader = None
+    if reader_model:
+        client = resolve_client(
+            model=reader_model, base_url=reader_base_url,
+            api_key=os.environ.get(READER_API_KEY_ENV),
+        )
+        if client is None:
+            typer.echo(
+                f"Reader enabled but no API key in ${READER_API_KEY_ENV} or ${API_KEY_ENV}; "
+                "qa_accuracy + abstention will be null.",
+                err=True,
+            )
+        else:
+            reader = Reader(client)
+
     try:
         adapter = adapter_cls(adapter_config)
         if reset:
@@ -150,6 +179,7 @@ def run(
         result = run_pack(
             loaded_pack, adapter, backend_name=backend, judge=judge_obj,
             step_timeout=step_timeout, seed=seed, repeat=repeat_index,
+            tokenizer=default_tokenizer(), reader=reader,
         )
     except CacheMissError as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -279,7 +309,7 @@ def rescore(
                 cache_path=judge_cache, strict=True,
             )
         traces = [StepTrace(**t) for t in report_data["traces"]]
-        scores = score_run(loaded_pack, traces, judge_obj)
+        scores, by_category = score_all(loaded_pack, traces, judge_obj)
     except (
         PackValidationError, ValueError, TypeError, KeyError, OSError, CacheMissError,
         yaml.YAMLError,
@@ -292,11 +322,14 @@ def rescore(
         for name, value in scores.items()
         if report_data["scores"].get(name) != value
     }
+    if report_data.get("by_category") != by_category:
+        diffs["by_category"] = (report_data.get("by_category"), by_category)
     if out is not None:
         error_rate = scores["error_rate"]
         report_data.update(
             traces=[asdict(t) for t in traces],
             scores=scores,
+            by_category=by_category,
             valid=error_rate is None or error_rate <= MAX_ERROR_RATE,
         )
         out.write_text(json.dumps(report_data, indent=2))

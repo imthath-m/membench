@@ -12,11 +12,14 @@ from __future__ import annotations
 from html import escape
 
 from membench.core.report.markdown import (
+    _CATEGORY_METRICS,
     _METRIC_NOTES,
     _METRICS,
+    _categories,
+    _category_cell,
     _count_queries,
+    _fmt_score,
     _fmt_valid,
-    _fmt_value,
     _label,
 )
 
@@ -61,8 +64,15 @@ def _row(label: str, cells: list[str]) -> str:
     return f"<tr><th>{escape(label)}</th>{tds}</tr>"
 
 
+def _table(header: list[str], rows: str) -> str:
+    ths = "".join(f'<th class="value">{escape(h)}</th>' for h in header[1:])
+    return (
+        f"<table><thead><tr><th>{escape(header[0])}</th>{ths}</tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
 def _render_single(report: dict) -> tuple[str, str]:
-    scores = report.get("scores", {})
     pack = report.get("pack_name", "?")
     title = f"MemBench scorecard: {pack}"
 
@@ -74,11 +84,12 @@ def _render_single(report: dict) -> tuple[str, str]:
         f"<li>Steps: {len(report.get('traces', []))} "
         f"({_count_queries(report)} queries)</li>"
         f"<li>Valid: {escape(_fmt_valid(report))}</li>"
+        f"<li>Tokenizer: {escape(str(report.get('manifest', {}).get('tokenizer', '?')))}</li>"
         "</ul>"
     )
 
     rows = "".join(
-        _row(label, [_fmt_value(kind, scores.get(key))])
+        _row(label, [_fmt_score(report, key, kind)])
         for key, label, kind in _METRICS
     )
     table = (
@@ -92,9 +103,19 @@ def _render_single(report: dict) -> tuple[str, str]:
         for key, label, _ in _METRICS
     )
 
+    categories = _categories([report])
+    by_category = ""
+    if categories:
+        category_rows = "".join(
+            _row(c, [_category_cell(report, c, k, kind) for k, _, kind in _CATEGORY_METRICS])
+            for c in categories
+        )
+        header = ["Category", *(label for _, label, _ in _CATEGORY_METRICS)]
+        by_category = f"<h2>By category</h2>\n{_table(header, category_rows)}\n"
+
     body = (
         f"<h1>{escape(title)}</h1>\n{meta}\n"
-        f"<h2>Scores</h2>\n{table}\n"
+        f"<h2>Scores</h2>\n{table}\n{by_category}"
         f"<h2>Breakdown</h2>\n<ul>{breakdown}</ul>"
     )
     return title, body
@@ -114,10 +135,22 @@ def _render_comparison(reports: list[dict]) -> tuple[str, str]:
         + "</tr>"
     )
     rows = "".join(
-        _row(label, [_fmt_value(kind, r.get("scores", {}).get(key)) for r in reports])
+        _row(label, [_fmt_score(r, key, kind) for r in reports])
         for key, label, kind in _METRICS
     )
     table = f"<table><thead>{header}</thead><tbody>{rows}</tbody></table>"
+
+    categories = _categories(reports)
+    by_category = ""
+    if categories:
+        category_rows = "".join(
+            _row(c, [_category_cell(r, c, "recall_precision", "ratio") for r in reports])
+            for c in categories
+        )
+        by_category = (
+            "<h2>Recall precision by category</h2>\n"
+            f"{_table(['Category', *labels], category_rows)}\n"
+        )
 
     runs = "".join(
         f"<li><strong>{escape(str(r.get('backend_name', '?')))}</strong> on "
@@ -128,7 +161,7 @@ def _render_comparison(reports: list[dict]) -> tuple[str, str]:
 
     body = (
         f"<h1>{escape(title)}</h1>\n"
-        f"<h2>Scores</h2>\n{table}\n"
+        f"<h2>Scores</h2>\n{table}\n{by_category}"
         f"<h2>Runs</h2>\n<ul class=\"meta\">{runs}</ul>"
     )
     return title, body
