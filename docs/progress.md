@@ -10,6 +10,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 12 | claude/gracious-edison-v8eyxs-phase-12 | #10 | done (oracle ±3pp + LoCoMo human audit blocked) |
 | 13 | claude/gracious-edison-v8eyxs-phase-13 | #11 | done (LLM-backed repeats blocked) |
 | 14 | claude/gracious-edison-v8eyxs-phase-14 | #12 | done (live vendor runs blocked) |
+| 15 | claude/gracious-edison-v8eyxs-phase-15 | — | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -181,3 +182,15 @@ Status: done (with blocked items)
   - Decisions: Cognee recall defaults to `CHUNKS` (traceable) rather than a graph completion type; Zep recall is `graph.search_edges` with a `valid_at <= at` filter (context block not used); Letta archival agents are created with empty `human` / `persona` blocks and `openai/gpt-4o-mini` / `openai/text-embedding-3-small` handles; Graphiti (self-hosted Zep) is documented, not implemented. Cognee's `reset()` prunes the whole local Cognee install (roadmap wording); Cognee picks up AWS env credentials and then needs `s3fs`.
   - Tests: `tests/test_contract_suite.py` (FACTORIES covers every registered backend; a test fails if a backend is registered without one), `tests/vendor_fakes.py` (SDK fakes with async-ingestion semantics: a missing flush fails), `tests/test_vendor_adapters.py`, `tests/test_baselines.py`, `tests/test_live_backends.py` (skipped unless `MEMBENCH_LIVE=1` + keys). CI `chroma` job also runs the contract suite with real chromadb.
 
+## Phase 15 — Judge validation
+Status: in progress
+- [ ] Synthetic packs carry judge rubrics (semantic_recall on answerable queries, contradiction on update queries) so every judge metric has ≥200 candidate items
+- [ ] `membench judge-sample`: stratified by metric, backend, verdict, context-length bucket; ≥200 items per judge metric
+- [ ] Labelling guidelines (2 independent annotators + adjudication)
+- [ ] `validation/labels.jsonl` format + loader/validator; merge of 2 annotators + adjudication
+- [ ] `membench judge-agreement`: human–human κ; judge–majority-human κ, accuracy, false-pass/false-fail; by context-length bucket; validated/unvalidated per metric → `validation/agreement-v<N>.json`
+- [ ] Cross-judge runner (≥3 judge configs incl. an open-weight model via OpenAI-compatible base URL); pairwise κ + disagreeing items
+- [ ] Prompt-versioning policy (docs + test pinning the prompt to `JUDGE_PROMPT_VERSION`)
+- [ ] Reports mark judge metrics `unvalidated` unless a committed validation result validates (judge model, prompt version, metric)
+- [ ] Offline judge-sample from full-context / chroma / bm25 on synthetic packs
+- [ ] Secret-gated manual workflow for cross-judge + agreement; README section
