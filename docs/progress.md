@@ -7,6 +7,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 9 | claude/gracious-edison-v8eyxs-phase-9 | #7 | done |
 | 10 | claude/gracious-edison-v8eyxs-phase-10 | #8 | done (cost-vs-dashboard blocked) |
 | 11 | claude/gracious-edison-v8eyxs-phase-11 | #9 | done (live reader run blocked) |
+| 12 | claude/gracious-edison-v8eyxs-phase-12 | — | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -56,7 +57,7 @@ Status: done
 ## Phase 10 — Reproducibility + cost accounting
 Status: done (with blocked items)
 - [x] Run manifest in every report (schema_version, membench version + git commit/dirty, Python/OS, backend SDK versions, redacted backend config, pack name + sha256, dataset slot, judge/reader/backend models + base URLs, judge prompt version, tokenizer, seed, repeat index, deployment, start/finish)
-- [ ] `JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`
+- [x] `JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`
 - [x] Judge `--strict-cache` (cache miss is an error)
 - [x] `membench rescore --in report.json` (no adapter, no network)
 - [x] `uv.lock` + frozen sync for published (live) runs; floor versions kept
@@ -100,3 +101,16 @@ Status: done (with blocked items)
   - Full-context context lines now carry the event timestamp (`[<ts>] [role] content`) so temporal questions are answerable from the log; Chroma/Mem0 contexts are unchanged (no dates), which `temporal_accuracy` exposes.
   - Bundled packs: `mini` kept its 8-step shape (tests index into it). `customer_support` (22 steps, 11 queries) and `coding_assistant` (24 steps, 11 queries) gained temporal, abstention and forget queries (+ one forget step each). All writes have explicit ids. Pack sha256s changed.
   - Phase 10's checklist still shows "`JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`" unticked, though its notes say it is done (code confirms: manifest `judge.prompt_version`, cache key `{model}:v1:{sha}`, entries hold `raw` + `usage`).
+
+## Phase 12 — Datasets: public loaders + harder synthetic packs
+Status: in progress
+- [ ] `membench/datasets/` loader core: pinned revision download, sha256 check, cache under `~/.cache/membench`, in-memory `Pack`; manifest `dataset`; `rescore` loader hook
+- [ ] `membench convert` writes YAML locally (inspection only)
+- [ ] LongMemEval loader (S / M / oracle) + official judge prompt for QA accuracy
+- [ ] LoCoMo loader (adversarial → abstain) + gold-answer exclusion list; scores with and without it
+- [ ] `--limit` / `--sample N --seed` stratified subsets
+- [ ] Synthetic generator v2 (seeded, template-based; sessions, distractors, update chains, time gaps, multi-hop, abstention, forget; optional LLM paraphrase pass)
+- [ ] Packs ≥200 queries, ≥30 per category: `tool_call_memory`, `document_chain`, `multi_step_decisions`, scaled `customer_support` / `coding_assistant`; byte-identical per seed
+- [ ] Tests (fixtures only, no dataset content) + README docs
+- [ ] LongMemEval_S and LoCoMo end-to-end on `full-context` and `chroma`
+- [ ] Full-context oracle QA accuracy within ±3pp of the paper
