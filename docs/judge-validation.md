@@ -59,7 +59,7 @@ reason to rework the prompt.
 
 | Field | Meaning |
 |---|---|
-| `id` | sha256 of (metric, rubric, evidence, prompt): stable across judge prompt versions |
+| `id` | sha256 of (metric, rubric, evidence): stable across judge prompt versions |
 | `metric` | `semantic_recall`, `contradiction_rate`, `qa_accuracy`, or `qa_accuracy:longmemeval` (the official LongMemEval prompt) |
 | `backend`, `pack`, `step_index`, `category` | where the item came from |
 | `rubric` | the statement to check (for QA: question + reference answer) |

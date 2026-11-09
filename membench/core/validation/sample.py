@@ -71,6 +71,8 @@ def judge_items(report: dict, pack: Pack, cache: JudgeCache | None = None,
                 judge_model: str | None = None) -> list[dict[str, Any]]:
     """Every judge item of a report's first run, with its cached verdict if any."""
     traces = [StepTrace(**copy.deepcopy(t)) for t in report["traces"]]
+    for trace in traces:  # judge errors of the original run would look like recorded calls
+        trace.detail.pop("judge_error", None)
     steps = {t.step_index: s for s, t in zip(pack.steps, traces)}
     backend = report["backend_name"]
     items = []
@@ -105,7 +107,7 @@ def judge_items(report: dict, pack: Pack, cache: JudgeCache | None = None,
 
 def _item_id(metric: str, item: dict) -> str:
     """Stable across prompt versions: humans label the statement, not the prompt."""
-    text = json.dumps([metric, item["rubric"], item["evidence"], item.get("prompt", "")])
+    text = json.dumps([metric, item["rubric"], item["evidence"]])
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
