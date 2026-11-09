@@ -185,12 +185,12 @@ Status: done (with blocked items)
 ## Phase 15 — Judge validation
 Status: in progress
 - [x] Synthetic packs carry judge rubrics (semantic_recall on answerable queries, contradiction on update queries) so every judge metric has ≥200 candidate items
-- [ ] `membench judge-sample`: stratified by metric, backend, verdict, context-length bucket; ≥200 items per judge metric
+- [x] `membench judge-sample`: stratified by metric, backend, verdict, context-length bucket; ≥200 items per judge metric
 - [ ] Labelling guidelines (2 independent annotators + adjudication)
-- [ ] `validation/labels.jsonl` format + loader/validator; merge of 2 annotators + adjudication
-- [ ] `membench judge-agreement`: human–human κ; judge–majority-human κ, accuracy, false-pass/false-fail; by context-length bucket; validated/unvalidated per metric → `validation/agreement-v<N>.json`
-- [ ] Cross-judge runner (≥3 judge configs incl. an open-weight model via OpenAI-compatible base URL); pairwise κ + disagreeing items
+- [x] `validation/labels.jsonl` format + loader/validator; merge of 2 annotators + adjudication
+- [x] `membench judge-agreement`: human–human κ; judge–majority-human κ, accuracy, false-pass/false-fail; by context-length bucket; validated/unvalidated per metric → `validation/agreement-v<N>.json`
+- [x] Cross-judge runner (≥3 judge configs incl. an open-weight model via OpenAI-compatible base URL); pairwise κ + disagreeing items
 - [ ] Prompt-versioning policy (docs + test pinning the prompt to `JUDGE_PROMPT_VERSION`)
-- [ ] Reports mark judge metrics `unvalidated` unless a committed validation result validates (judge model, prompt version, metric)
+- [x] Reports mark judge metrics `unvalidated` unless a committed validation result validates (judge model, prompt version, metric)
 - [ ] Offline judge-sample from full-context / chroma / bm25 on synthetic packs
 - [ ] Secret-gated manual workflow for cross-judge + agreement; README section

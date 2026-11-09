@@ -16,6 +16,8 @@ from __future__ import annotations
 from membench.core.runner import MAX_ERROR_RATE
 from membench.core.scoring.latency import MIN_P95_SAMPLES
 from membench.core.stats import MIN_CATEGORY_N, MIN_HEADLINE_N
+from membench.core.validation import JUDGE_METRICS
+from membench.core.validation.status import report_metric_status
 
 # (key, human label, kind) — `kind` drives value formatting. `ratio` metrics
 # live in 0..1 and render as percentages; everything else is a plain number.
@@ -124,19 +126,30 @@ def _note(stat: dict | None, min_n: int, value: object) -> str:
     return f"{'suppressed' if value is None else 'indicative'} (n < {min_n})"
 
 
+def _judge_flag(report: dict, key: str, value: object) -> str:
+    """`unvalidated` for a judge metric no committed validation result validates."""
+    if key not in JUDGE_METRICS or value is None:
+        return ""
+    return "" if report_metric_status(report, key) == "validated" else "unvalidated"
+
+
 def _fmt_score(report: dict, key: str, kind: str) -> str:
-    """Compact cell: value, 95% CI, n and an indicative label (when stats exist)."""
-    return _cell(_value(report, key, kind), kind, _stat(report, key), _min_n(key),
-                 report.get("scores", {}).get(key))
+    """Compact cell: value, 95% CI, n and indicative / unvalidated labels (when stats exist)."""
+    value = report.get("scores", {}).get(key)
+    return _cell(_value(report, key, kind), kind, _stat(report, key), _min_n(key), value,
+                 _judge_flag(report, key, value))
 
 
-def _cell(text: str, kind: str, stat: dict | None, min_n: int, value: object) -> str:
+def _cell(text: str, kind: str, stat: dict | None, min_n: int, value: object,
+          flag: str = "") -> str:
     if stat is None or value is None:
         return text
     parts = [text, _fmt_ci(kind, stat), f"n={stat['n']}"]
     note = _note(stat, min_n, value)
     if note:
         parts.append("(indicative)")
+    if flag:
+        parts.append(f"({flag})")
     return " ".join(p for p in parts if p)
 
 
@@ -159,7 +172,7 @@ def _category_cell(report: dict, category: str, key: str, kind: str) -> str:
     if key == "n":
         return _fmt_value(kind, value)
     return _cell(_fmt_value(kind, value), kind, _stat(report, key, category),
-                 MIN_CATEGORY_N, value)
+                 MIN_CATEGORY_N, value, _judge_flag(report, key, value))
 
 
 def _count_queries(report: dict) -> int:
@@ -222,7 +235,7 @@ def _render_single(report: dict) -> str:
     lines += ["", "## Breakdown", ""]
     for key, label, _ in _METRICS:
         lines.append(f"- **{label}:** {_METRIC_NOTES[key]}")
-    lines += ["", _STATS_NOTE, ""]
+    lines += ["", _STATS_NOTE, "", _JUDGE_NOTE, ""]
     return "\n".join(lines)
 
 
@@ -230,6 +243,13 @@ _STATS_NOTE = (
     "95% CIs: Wilson for pass/fail rates, seeded bootstrap over queries (10k resamples) "
     f"otherwise. Indicative: n below {MIN_HEADLINE_N} overall, {MIN_CATEGORY_N} per "
     f"category, or {MIN_P95_SAMPLES} samples for p95 latency (suppressed)."
+)
+
+
+_JUDGE_NOTE = (
+    "Judge metrics are `unvalidated` unless the committed validation result for the run's "
+    "judge prompt version (validation/agreement-v<N>.json) validates its judge model on "
+    "that metric; see docs/judge-validation.md."
 )
 
 
@@ -242,7 +262,8 @@ def _score_row(report: dict, key: str, label: str, kind: str, repeats: int | Non
         _value(report, key, kind),
         _fmt_ci(kind, stat) if value is not None else "",
         str(stat["n"]) if stat else "",
-        _note(stat, _min_n(key), value),
+        "; ".join(n for n in (_note(stat, _min_n(key), value),
+                               _judge_flag(report, key, value)) if n),
     ]
     if repeats:
         cells.append(_fmt_repeats(report, key, kind))
