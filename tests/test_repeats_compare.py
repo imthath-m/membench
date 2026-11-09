@@ -188,3 +188,21 @@ def test_compare_cli_on_two_real_runs(tmp_path):
                                   "--b", str(tmp_path / "c.json")])
     assert refused.exit_code == 1
     assert "different packs" in refused.output
+
+
+class EchoReaderClient:
+    model = "stub-reader"
+    base_url = None
+
+    def respond(self, prompt):
+        return "I don't know", {"input_tokens": 3, "output_tokens": 2}
+
+
+def test_reader_defaults_to_three_repeats_with_per_repeat_cost(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_module, "resolve_client", lambda **kw: EchoReaderClient())
+    data = _run(tmp_path, "--backend", "full-context", "--pack", "customer-support",
+                "--reader-model", "stub-reader")
+    runs = [data, *data["repeats"]]
+    assert len(runs) == 3
+    calls = [r["cost"]["reader"]["calls"] for r in runs]
+    assert calls[0] > 0 and calls == [calls[0]] * 3  # not cumulative across repeats
