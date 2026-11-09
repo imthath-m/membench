@@ -7,7 +7,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 9 | claude/gracious-edison-v8eyxs-phase-9 | #7 | done |
 | 10 | claude/gracious-edison-v8eyxs-phase-10 | #8 | done (cost-vs-dashboard blocked) |
 | 11 | claude/gracious-edison-v8eyxs-phase-11 | #9 | done (live reader run blocked) |
-| 12 | claude/gracious-edison-v8eyxs-phase-12 | — | in progress |
+| 12 | claude/gracious-edison-v8eyxs-phase-12 | — | done (oracle ±3pp + LoCoMo human audit blocked) |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -100,10 +100,10 @@ Status: done (with blocked items)
   - Ingest tokens: the runner reads `adapter.usage()` before/after each `recall()`; `ingest = total backend tokens - recall tokens`.
   - Full-context context lines now carry the event timestamp (`[<ts>] [role] content`) so temporal questions are answerable from the log; Chroma/Mem0 contexts are unchanged (no dates), which `temporal_accuracy` exposes.
   - Bundled packs: `mini` kept its 8-step shape (tests index into it). `customer_support` (22 steps, 11 queries) and `coding_assistant` (24 steps, 11 queries) gained temporal, abstention and forget queries (+ one forget step each). All writes have explicit ids. Pack sha256s changed.
-  - Phase 10's checklist still shows "`JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`" unticked, though its notes say it is done (code confirms: manifest `judge.prompt_version`, cache key `{model}:v1:{sha}`, entries hold `raw` + `usage`).
+  - Phase 10's checklist still shows "`JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`" unticked, though its notes say it is done (code confirms: manifest `judge.prompt_version`, cache key `{model}:v1:{sha}`, entries hold `raw` + `usage`). (Now ticked.)
 
 ## Phase 12 — Datasets: public loaders + harder synthetic packs
-Status: in progress
+Status: done (with blocked items)
 - [x] `membench/datasets/` loader core: pinned revision download, sha256 check, cache under `~/.cache/membench`, in-memory `Pack`; manifest `dataset`; `rescore` loader hook
 - [x] `membench convert` writes YAML locally (inspection only)
 - [x] LongMemEval loader (S / M / oracle) + official judge prompt for QA accuracy
@@ -112,9 +112,9 @@ Status: in progress
 - [x] Synthetic generator v2 (seeded, template-based; sessions, distractors, update chains, time gaps, multi-hop, abstention, forget; optional LLM paraphrase pass)
 - [x] Packs ≥200 queries, ≥30 per category: `tool_call_memory`, `document_chain`, `multi_step_decisions`, scaled `customer_support` / `coding_assistant`; byte-identical per seed
 - [x] Tests (fixtures only, no dataset content) + README docs
-- [ ] LongMemEval_S and LoCoMo end-to-end on `full-context` and `chroma`
-- [ ] Full-context oracle QA accuracy within ±3pp of the paper
-- [ ] Lower priority: BEAM / MemoryAgentBench loaders (deferred)
+- [x] LongMemEval_S and LoCoMo end-to-end on `full-context` and `chroma` (no judge; each followed by `membench rescore --check` → identical): full-context LongMemEval_S 500 q, evidence_recall@k 1.0, error_rate 0; full-context LoCoMo evidence_recall@k 1.0, error_rate 0; chroma LoCoMo full (7,868 traces) evidence_recall@k 0.187, error_rate 0; chroma LongMemEval_S `--limit 5` (2,695 traces) evidence_recall@k 0.60, error_rate 0. Full chroma S run (~14 h) not done — adapter throughput, not a bug.
+- [ ] Full-context oracle QA accuracy within ±3pp of the paper — Blocked (API key; see below)
+- [ ] Lower priority: BEAM / MemoryAgentBench loaders — Deferred, not in this PR (see below)
 - Blocked: ±3pp LongMemEval reproduction — needs a reader + judge API key (paper used GPT-4o for both). Official reader/judge prompts are wired in and checked verbatim against upstream (`qa_style: longmemeval`). Once a key exists: `MEMBENCH_JUDGE_API_KEY=<openai key> membench run --backend full-context --pack longmemeval-oracle --reader-model gpt-4o-2024-08-06 --reader-base-url https://api.openai.com/v1 --judge-model gpt-4o-2024-08-06 --judge-base-url https://api.openai.com/v1 --out lme-oracle.json`, then compare `scores.qa_accuracy` (and `by_category`) to the paper's oracle row for that reader. Known gap sources to check: our context is full-context's `[ts] [role] content` lines, not the official per-session JSON history; Anthropic reader `max_tokens` is 256 (official 500); the cleaned dataset release (2025-09) differs from the paper's original files.
 - Blocked: human audit of LoCoMo gold answers — needs a human annotator. `locomo_exclusions.yaml` holds the 9 items an automated structural audit flagged (unresolvable / missing evidence, adversarial items with a contradicting gold answer); add human findings in the same format.
 - Deferred (lower priority, per roadmap): BEAM and MemoryAgentBench loaders. License check done: HF `ai-hyz/MemoryAgentBench` is tagged MIT; a HF `Mohammadta/BEAM` dataset is tagged CC BY-SA 4.0 but is not yet confirmed as BEAM's official release.
