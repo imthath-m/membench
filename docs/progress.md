@@ -58,8 +58,8 @@ Status: in progress
 - [ ] `JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`
 - [x] Judge `--strict-cache` (cache miss is an error)
 - [x] `membench rescore --in report.json` (no adapter, no network)
-- [ ] `uv.lock` + frozen sync for published (live) runs; floor versions kept
+- [x] `uv.lock` + frozen sync for published (live) runs; floor versions kept
 - [ ] Cost tracking: judge / reader / backend tokens from API `usage`; dated price table → USD per run and per 1k queries (Mem0 `usage()`)
 - [ ] Determinism: seed, embedding model id + temperature recorded; non-determinism documented
 - [x] Committed JSON Schema; every report validates (test)
-- [ ] CI test: `rescore` on a committed report reproduces identical scores offline
+- [x] CI test: `rescore` on a committed report reproduces identical scores offline

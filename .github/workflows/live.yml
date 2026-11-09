@@ -37,8 +37,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install membench (mem0 extra)
-        run: pip install -e ".[mem0]"
+      # Published runs come from a frozen sync of uv.lock (exact versions).
+      - name: Install membench (mem0 extra, frozen from uv.lock)
+        run: |
+          pip install uv
+          uv sync --frozen --extra mem0
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Live mem0 run with judge
         env:
@@ -50,6 +54,7 @@ jobs:
           if [ -n "$JUDGE_BASE_URL" ]; then args+=(--judge-base-url "$JUDGE_BASE_URL"); fi
           membench run --backend mem0 --pack "$PACK" --judge --judge-model "$JUDGE_MODEL" \
             "${args[@]}" --out live-report.json
+          membench rescore --in live-report.json --check
           membench report --in live-report.json --format md --out live-report.md
           cat live-report.md >> "$GITHUB_STEP_SUMMARY"
 
