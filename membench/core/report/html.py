@@ -15,6 +15,7 @@ from membench.core.report.markdown import (
     _METRIC_NOTES,
     _METRICS,
     _count_queries,
+    _fmt_valid,
     _fmt_value,
     _label,
 )
@@ -72,6 +73,7 @@ def _render_single(report: dict) -> tuple[str, str]:
         f"<li>Finished: {escape(str(report.get('finished_at', '?')))}</li>"
         f"<li>Steps: {len(report.get('traces', []))} "
         f"({_count_queries(report)} queries)</li>"
+        f"<li>Valid: {escape(_fmt_valid(report))}</li>"
         "</ul>"
     )
 

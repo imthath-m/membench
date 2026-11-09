@@ -49,3 +49,11 @@ def test_multi_report_is_side_by_side_comparison():
 
 def test_empty_reports_does_not_crash():
     assert "No reports" in render_markdown([])
+
+
+def test_single_report_shows_error_rate_and_invalid_flag():
+    report = _report(error_rate=0.25)
+    report["valid"] = False
+    md = render_markdown([report])
+    assert "| Error rate | 25% |" in md
+    assert "**Valid:** no" in md

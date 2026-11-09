@@ -7,7 +7,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 
 ## Phase 8 — Hardening + first live run
 Status: in progress
-- [ ] CLI builds adapter + `reset()` inside error handling; one-line error for missing extra; test with `mem0` import blocked; fix README and `docs/mem0.md`
+- [x] CLI builds adapter + `reset()` inside error handling; one-line error for missing extra; test with `mem0` import blocked; fix README and `docs/mem0.md`
 - [x] `core/retry.py`: exponential backoff + jitter; adapters declare `retryable` exception tuple (Mem0: OpenAI rate limit / timeout)
 - [x] Per-step timeout `--step-timeout` (default 120s)
 - [x] Per-step error capture: trace `error`, run continues, report `error_rate`, run marked invalid above threshold
