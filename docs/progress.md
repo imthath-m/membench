@@ -8,6 +8,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 | 10 | claude/gracious-edison-v8eyxs-phase-10 | #8 | done (cost-vs-dashboard blocked) |
 | 11 | claude/gracious-edison-v8eyxs-phase-11 | #9 | done (live reader run blocked) |
 | 12 | claude/gracious-edison-v8eyxs-phase-12 | #10 | done (oracle ±3pp + LoCoMo human audit blocked) |
+| 13 | claude/gracious-edison-v8eyxs-phase-13 | — | in progress |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -127,3 +128,15 @@ Status: done (with blocked items)
   - LoCoMo: categories mapped 1 multi_hop, 2 temporal, 3 open_domain, 4 single_hop, 5 adversarial (abstain). Queries asked at last turn + 1 day. Note `temporal` category name collides with membench's `temporal_accuracy` (expect_contains-based) but LoCoMo queries have no `expect_contains`, so that metric stays None for it. `--exclude-flagged` on `run` drops flagged queries; on `rescore` it scores a full run without them (refused on --limit/--sample runs).
   - Synthetic: `generate/synthetic.py` (`generate(name, seed, knobs)`, `Knobs`, `paraphrase_queries`) + `generate/domains.py` (5 domains). Default 36 episodes × 6 categories = 216 queries, 1,188 steps. Not committed as YAML; generated on load (~10 ms). `GENERATOR_VERSION` must be bumped on any template/logic change (it is in the manifest revision).
   - Real-data runs here (no judge): full-context LongMemEval_S (247k writes, 500 q) 67 s, report 622 MB (contexts are stored on traces — consider trimming for large runs); full-context LoCoMo 30 s. Chroma's adapter is slow (~5 writes/s on this 4-CPU box), so LongMemEval_S on chroma was run with `--limit 5`; a full S run is ~14 h at that rate.
+
+## Phase 13 — Statistical rigor
+Status: in progress
+- [ ] `--repeats N` (default 3 when backend or judge/reader uses an LLM, else 1); fresh `reset()` + new namespace per repeat; report holds mean, run-to-run SD, every repeat
+- [ ] 95% CIs: seeded bootstrap over queries (10k resamples) / Wilson for plain proportions, next to every rate
+- [ ] Paired comparison (`membench compare`): paired bootstrap of the difference + McNemar for pass/fail metrics; flags differences whose CI includes 0
+- [ ] Minimum sample sizes enforced in reports: headline ≥385, per-category ≥100 ("indicative"), p95 ≥100 per op
+- [ ] Holm correction in comparison reports (metrics × categories)
+- [ ] md/html reports show n + CI for every metric; suppress/label below min n
+- [ ] `rescore` reproduces CIs (seeded); schema + fixture regenerated
+- [ ] Two runs of the same config have overlapping CIs (offline demo on full-context / chroma)
+- [ ] Tests + README docs
