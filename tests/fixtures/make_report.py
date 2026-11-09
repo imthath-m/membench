@@ -2,9 +2,10 @@
 
     python tests/fixtures/make_report.py
 
-Runs the `customer_support` pack on `full-context` with a deterministic fake
-judge client (no API key, no network) and writes `report_customer_support.json`
-and `judge_cache_customer_support.json` next to this file.
+Runs the `customer_support` pack on `full-context` with deterministic fake
+judge and reader clients (no API key, no network) and writes
+`report_customer_support.json` and `judge_cache_customer_support.json` next to
+this file.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import json
 from pathlib import Path
 
 from membench.adapters.full_context import FullContextAdapter
+from membench.core.reader import ABSTAIN_ANSWER, Reader
 from membench.core.report.json import write_json
 from membench.core.runner import run_pack
 from membench.core.scoring.judge import DEFAULT_JUDGE_MODEL, CachedJudge
@@ -36,11 +38,27 @@ class FakeJudgeClient:
         return reply, {"input_tokens": len(prompt.split()), "output_tokens": 12}
 
 
+class FakeReaderClient:
+    """Abstains on phone questions, else answers with the last memory line."""
+
+    model = "claude-haiku-4-5"
+    base_url = "https://api.anthropic.com"
+
+    def respond(self, prompt: str) -> tuple[str, dict[str, int]]:
+        memory, question = prompt.split("MEMORY:")[-1].split("QUESTION:")
+        lines = memory.strip().splitlines()
+        reply = ABSTAIN_ANSWER if "phone" in question or not lines else lines[-1]
+        return reply, {"input_tokens": len(prompt.split()), "output_tokens": len(reply.split())}
+
+
 def main() -> None:
     CACHE.unlink(missing_ok=True)
     judge = CachedJudge(FakeJudgeClient(), CACHE)
     pack = load_pack(builtin_pack_path("customer_support"))
-    result = run_pack(pack, FullContextAdapter(), backend_name="full-context", judge=judge)
+    result = run_pack(
+        pack, FullContextAdapter(), backend_name="full-context", judge=judge,
+        reader=Reader(FakeReaderClient()),
+    )
     write_json(result, REPORT)
 
 

@@ -1,5 +1,68 @@
 {
-  "claude-sonnet-5:v1:442ef8c147e5514c2a0e9c24ba35054b6892128e2c3ae4077947fff502f3847d": {
+  "claude-sonnet-5:v1:0cffc06c3276b958ee587d1c253965e4ba5da6a81383096280e83badd1a80098": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 94,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:182de3840bf82063d8a099d4cf2addcc82407c6f80f420dabf3715f5aa352c0d": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 78,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:1e10a5fa05edd3e106f0892709e3df2423f140f4d8317cdb7af3b544d2e5125d": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 90,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:38baeeae47e7f3a262edfb70dde71b4cc8650857d5b28753bfdb1d1104df9ea2": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 156,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:4b89384834b7ef5c51a675466ae3b1f60b01dc32617a0354b8cf1e53a57d6b7e": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 87,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:83a62cd974e8b7ac18a6071c9a378b3daa78df49cb72262cd9a5088f1907753a": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 91,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:98327830024c8c78a9ad504a2cf28ce85dfe37c4716245d6e21fe795dbc45520": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 77,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:b7331a86d8b977de28d24192fa6fd3f620f23eefdb0cb0eb98f956c1586d26fd": {
     "passed": true,
     "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
     "reason": "fixture",
@@ -8,30 +71,48 @@
       "output_tokens": 12
     }
   },
-  "claude-sonnet-5:v1:61b94d0a9a86ac5a15e9d061c9b227fd516cffd4866020e2655653b0ac0fdcfc": {
+  "claude-sonnet-5:v1:c45d9b11688ac485d0d46c1472bae1e68373b39e6bc2ccfa9a95a55112930291": {
     "passed": true,
     "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
     "reason": "fixture",
     "usage": {
-      "input_tokens": 147,
+      "input_tokens": 88,
       "output_tokens": 12
     }
   },
-  "claude-sonnet-5:v1:6945bbbc7b96077ffe57ba5df070f29e52ec04f77c8a9312b1e823d85165aed3": {
+  "claude-sonnet-5:v1:cf992fa6030589639ef364f52497a7ec1df06f99e94172389633f3c7b9d8e5be": {
     "passed": true,
     "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
     "reason": "fixture",
     "usage": {
-      "input_tokens": 116,
+      "input_tokens": 163,
       "output_tokens": 12
     }
   },
-  "claude-sonnet-5:v1:bd0a4effd22dccc55800025528494f0651f3dc5b84fa3fb6d5c94e29af2b8347": {
+  "claude-sonnet-5:v1:d27733a55a25f8a4c218b7efe3ad283c30391ae347b693f073fd428052f961bb": {
     "passed": true,
     "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
     "reason": "fixture",
     "usage": {
-      "input_tokens": 154,
+      "input_tokens": 86,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:e1e51a4a1f4d71dadaa0eefb26246883ae60677ec3196ea080d270786a7b61cd": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 87,
+      "output_tokens": 12
+    }
+  },
+  "claude-sonnet-5:v1:e2c26a90b464296583a23822bd451588d4418b7f6a9d94a4656a9b74f16e47bb": {
+    "passed": true,
+    "raw": "{\"verdict\": \"pass\", \"reason\": \"fixture\"}",
+    "reason": "fixture",
+    "usage": {
+      "input_tokens": 130,
       "output_tokens": 12
     }
   }

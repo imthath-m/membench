@@ -132,6 +132,8 @@ def _parse_step(raw: dict, index: int, episode: int) -> Step:
 
     step_type = raw["type"]
     timestamp = raw.get("timestamp") or (_EPOCH + timedelta(seconds=index)).isoformat()
+    if isinstance(timestamp, datetime):  # an unquoted YAML timestamp
+        timestamp = timestamp.isoformat()
 
     if step_type == "write":
         if "key" in raw and "fact_key" not in raw:
