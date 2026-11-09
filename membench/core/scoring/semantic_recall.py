@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from membench.core.runner import StepTrace
+from membench.core.scoring.judge import JudgeError, record_judge_error
 from membench.packs.schema import Pack, QueryStep
 
 if TYPE_CHECKING:
@@ -27,7 +28,14 @@ def semantic_recall(
     results: list[bool] = []
     for step, trace in zip(pack.steps, traces):
         if isinstance(step, QueryStep) and step.judge and step.judge.semantic_recall:
-            verdict = judge.score(step.judge.semantic_recall, trace.detail["context"])
+            if trace.error is not None:  # a failed recall conveyed nothing
+                results.append(False)
+                continue
+            try:
+                verdict = judge.score(step.judge.semantic_recall, trace.detail["context"])
+            except JudgeError as exc:
+                record_judge_error(trace.detail, "semantic_recall", exc)
+                continue
             results.append(verdict.passed)
 
     if not results:

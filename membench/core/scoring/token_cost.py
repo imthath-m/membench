@@ -10,8 +10,12 @@ from membench.core.runner import StepTrace
 
 
 def token_cost(traces: list[StepTrace]) -> float | None:
-    """Mean `token_count` across query traces. None if there were no queries."""
-    counts = [t.detail["token_count"] for t in traces if t.step_type == "query"]
+    """Mean `token_count` across successful query traces; None if there were none."""
+    counts = [
+        t.detail["token_count"]
+        for t in traces
+        if t.step_type == "query" and t.error is None
+    ]
     if not counts:
         return None
     return sum(counts) / len(counts)

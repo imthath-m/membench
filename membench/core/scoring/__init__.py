@@ -1,4 +1,4 @@
-"""Scoring: four deterministic metrics plus two LLM-judge metrics.
+"""Scoring: four deterministic metrics, two LLM-judge metrics, and error rate.
 
 Each metric lives in its own module and takes the pack (for step
 intent/assertions) plus the run traces (for what actually happened) — never
@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from membench.core.runner import StepTrace
 from membench.core.scoring.contradiction_rate import contradiction_rate
+from membench.core.scoring.error_rate import error_rate
 from membench.core.scoring.latency import p95_latency_ms
 from membench.core.scoring.recall_precision import recall_precision
 from membench.core.scoring.semantic_recall import semantic_recall
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "contradiction_rate",
+    "error_rate",
     "p95_latency_ms",
     "recall_precision",
     "score_run",
@@ -48,4 +50,5 @@ def score_run(
         "p95_latency_ms": p95_latency_ms(traces),
         "semantic_recall": semantic_recall(pack, traces, judge),
         "contradiction_rate": contradiction_rate(pack, traces, judge),
+        "error_rate": error_rate(traces),
     }

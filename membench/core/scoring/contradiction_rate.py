@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from membench.core.runner import StepTrace
+from membench.core.scoring.judge import JudgeError, record_judge_error
 from membench.packs.schema import Pack, QueryStep
 
 if TYPE_CHECKING:
@@ -28,7 +29,13 @@ def contradiction_rate(
     results: list[bool] = []
     for step, trace in zip(pack.steps, traces):
         if isinstance(step, QueryStep) and step.judge and step.judge.contradiction:
-            verdict = judge.score(step.judge.contradiction, trace.detail["context"])
+            if trace.error is not None:  # nothing recalled to judge
+                continue
+            try:
+                verdict = judge.score(step.judge.contradiction, trace.detail["context"])
+            except JudgeError as exc:
+                record_judge_error(trace.detail, "contradiction_rate", exc)
+                continue
             results.append(verdict.passed)  # passed == contradiction present
 
     if not results:

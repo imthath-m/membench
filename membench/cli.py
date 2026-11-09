@@ -12,7 +12,7 @@ from membench.core.registry import get_adapter_class, list_backends
 from membench.core.report.html import render_html
 from membench.core.report.json import write_json
 from membench.core.report.markdown import render_markdown
-from membench.core.runner import run_pack
+from membench.core.runner import DEFAULT_STEP_TIMEOUT_S, MAX_ERROR_RATE, run_pack
 from membench.core.scoring.judge import (
     API_KEY_ENV,
     DEFAULT_JUDGE_MODEL,
@@ -87,6 +87,12 @@ def run(
     judge_cache: Path = typer.Option(
         Path(".membench_judge_cache.json"), "--judge-cache", help="On-disk judge response cache path."
     ),
+    step_timeout: float = typer.Option(
+        DEFAULT_STEP_TIMEOUT_S,
+        "--step-timeout",
+        help="Seconds each write/recall may take (retries included) before it is recorded "
+        "as an error.",
+    ),
 ) -> None:
     """Replay a scenario pack against a backend adapter and write a JSON report."""
     try:
@@ -112,12 +118,25 @@ def run(
                 err=True,
             )
 
-    adapter = adapter_cls(adapter_config)
-    if reset:
-        adapter.reset()
-    result = run_pack(loaded_pack, adapter, backend_name=backend, judge=judge_obj)
+    try:
+        adapter = adapter_cls(adapter_config)
+        if reset:
+            adapter.reset()
+    except Exception as exc:  # missing extra, bad config, unreachable backend
+        typer.echo(f"Error: could not set up backend {backend!r}: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    result = run_pack(
+        loaded_pack, adapter, backend_name=backend, judge=judge_obj, step_timeout=step_timeout
+    )
     write_json(result, out)
     typer.echo(f"Wrote report for pack={loaded_pack.name!r} backend={backend!r} to {out}")
+    if not result.valid:
+        typer.echo(
+            f"Warning: run is invalid: error_rate {result.scores['error_rate']:.0%} "
+            f"is above {MAX_ERROR_RATE:.0%} (see trace `error` fields).",
+            err=True,
+        )
 
 
 @app.command()
