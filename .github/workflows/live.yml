@@ -14,6 +14,9 @@ on:
       judge_base_url:
         description: "OpenAI-compatible judge base URL (empty = Anthropic)"
         default: ""
+      reader_model:
+        description: "Reader model id for qa_accuracy / abstention (empty = no reader)"
+        default: ""
 
 jobs:
   mem0:
@@ -41,7 +44,7 @@ jobs:
       - name: Install membench (mem0 extra, frozen from uv.lock)
         run: |
           pip install uv
-          uv sync --frozen --extra mem0
+          uv sync --frozen --extra mem0 --extra tokens
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Live mem0 run with judge
@@ -49,9 +52,11 @@ jobs:
           PACK: ${{ inputs.pack }}
           JUDGE_MODEL: ${{ inputs.judge_model }}
           JUDGE_BASE_URL: ${{ inputs.judge_base_url }}
+          READER_MODEL: ${{ inputs.reader_model }}
         run: |
           args=()
           if [ -n "$JUDGE_BASE_URL" ]; then args+=(--judge-base-url "$JUDGE_BASE_URL"); fi
+          if [ -n "$READER_MODEL" ]; then args+=(--reader-model "$READER_MODEL"); fi
           membench run --backend mem0 --pack "$PACK" --judge --judge-model "$JUDGE_MODEL" \
             "${args[@]}" --out live-report.json
           membench rescore --in live-report.json --check
