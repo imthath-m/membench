@@ -33,7 +33,7 @@ All code, tests, workflows and docs are in. What is left needs keys, people or a
 | 14 | claude/gracious-edison-v8eyxs-phase-14 | #12 | done (live vendor runs blocked) |
 | 15 | claude/gracious-edison-v8eyxs-phase-15 | #13 | done (human labels + cross-judge runs blocked) |
 | 16 | claude/gracious-edison-v8eyxs-phase-16 | #14 | done (live rows, 7-day smoke, PyPI publish blocked) |
-| Follow-up | claude/gracious-edison-v8eyxs-followup | (pending) | in progress |
+| Follow-up | claude/gracious-edison-v8eyxs-followup | #15 | done |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -256,8 +256,8 @@ Status: done (with blocked items)
   - Failure classes may overlap (a query can be both not retrieved and stale). Errored queries are counted, not classified.
   - `smoke.yml`: nightly `17 3 * * *` (frozen lock) + weekly `41 4 * * 1` (`pip install --upgrade`, unpinned); missing secrets → backend skipped with a notice; scheduled failure → one issue per mode (comment if open). `live.yml` gained `config` input + `membench publish` + `results/` artifact (it is the manual-only full-run path).
 
-## Follow-up (post-Phase 16)
-Status: in progress
+## Follow-up (post-Phase 16) — PR #15
+Status: done
 - [x] Regression test: `contains_any` must not match inside words ("Pro" vs "approved")
 - [x] `contains_any` matches whole words/phrases (case-insensitive, regex-escaped, punctuation-safe); decision documented
 - [x] Version decision recorded (no scoring version in the manifest)
@@ -267,7 +267,7 @@ Status: in progress
 - [x] `docs/HANDOFF.md` (state, PR stack, keys & setup table, open-items runbook, caveats, agent conventions)
 - [x] Root `CLAUDE.md` + README pointer; "Overall status" consistent with HANDOFF; no stale statements
 - [x] Checks: pytest, ruff, `uv lock --check`, results rescore + leaderboard diff
-- [ ] PR opened; number recorded here and in HANDOFF
+- [x] PR opened (#15); number recorded here and in HANDOFF
 - Notes:
   - Matching decision: `expect_absent` checks (`contains_any`: staleness, forget compliance) match whole words/phrases: case-insensitive, needle regex-escaped, `(?<!\w)needle(?!\w)` so punctuation-edged needles (`$49.99`, `C++`) still match. `expect_contains` checks (recall precision, update correctness, temporal accuracy) stay plain substrings: both choices err toward not penalising a backend (a stale value inside another word is no leak; an inflection like "tickets" still counts as a hit). Switching `expect_contains` too would change no committed result (checked), so it is a policy choice, not a data one. `report --failures` excerpts still centre on the first substring hit (display only).
   - Version decision: the manifest has no scoring/metric version (only report schema, judge prompt, reader prompt, generator versions); none of those describe this change, so nothing was bumped. Package stays 0.2.0 (unreleased). Effect: a report scored before this change fails `membench rescore --check` on staleness / forget compliance until re-scored (`rescore --out`, then `publish`).
