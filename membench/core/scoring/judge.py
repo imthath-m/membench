@@ -25,6 +25,7 @@ import hashlib
 import json
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -94,6 +95,13 @@ def parse_verdict(text: str) -> Verdict:
     obj = json.loads(text[start : end + 1])
     verdict = str(obj.get("verdict", "")).strip().lower()
     return Verdict(passed=verdict == "pass", reason=str(obj.get("reason", "")))
+
+
+def parse_yes_no(text: str) -> Verdict:
+    """Official LongMemEval rule: the reply passes if it contains "yes"."""
+    if not isinstance(text, str):
+        raise TypeError(f"judge reply text is {type(text).__name__}, not str")
+    return Verdict(passed="yes" in text.lower(), reason=text.strip())
 
 
 def _post_with_retry(http: Any, url: str, **kwargs: Any) -> Any:
@@ -262,7 +270,10 @@ class CachedJudge:
         self.usage = {"calls": 0, "cache_hits": 0, "input_tokens": 0, "output_tokens": 0}
 
     def score(self, rubric: str, evidence: str) -> Verdict:
-        prompt = build_prompt(rubric, evidence)
+        return self.ask(build_prompt(rubric, evidence))
+
+    def ask(self, prompt: str, parse: Callable[[str], Verdict] = parse_verdict) -> Verdict:
+        """Judge a ready-made prompt (e.g. an official benchmark template)."""
         key = JudgeCache.key(self.model, prompt)
         entry = self.cache.get(key)
         if entry is not None and (self.strict or "error" not in entry):
@@ -270,13 +281,13 @@ class CachedJudge:
         elif self.strict or self.client is None:
             raise CacheMissError(f"no cached verdict for {key} (strict judge cache)")
         else:
-            entry = self._call(prompt)
+            entry = self._call(prompt, parse)
             self.cache.set(key, entry)
         if "error" in entry:
             raise JudgeError(entry["error"])
         return Verdict(passed=entry["passed"], reason=entry["reason"])
 
-    def _call(self, prompt: str) -> dict:
+    def _call(self, prompt: str, parse: Callable[[str], Verdict]) -> dict:
         """Ask the client (one parse retry); return a cache entry."""
         usage, raw = {"input_tokens": 0, "output_tokens": 0}, None
         for attempt in range(2):
@@ -286,7 +297,7 @@ class CachedJudge:
                 for name in usage:
                     usage[name] += call_usage.get(name, 0)
                     self.usage[name] += call_usage.get(name, 0)
-                verdict = parse_verdict(raw)
+                verdict = parse(raw)
                 return {"passed": verdict.passed, "reason": verdict.reason, "raw": raw,
                         "usage": usage}
             except (KeyError, IndexError, TypeError) as exc:

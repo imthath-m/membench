@@ -1,0 +1,28 @@
+# LoCoMo QA items excluded from the "clean" score, with reasons.
+# Ids are `<sample_id>/q<index into that conversation's qa list>` at the pinned
+# revision (membench/datasets/locomo.py). Only ids and our reasons live here,
+# no dataset content (LoCoMo is CC BY-NC 4.0).
+#
+# Audit method (2026-11-09): automated structural checks of every QA item:
+# evidence ids that do not resolve to a dialogue turn, items with no evidence,
+# and adversarial items that carry a gold `answer` as well as an
+# `adversarial_answer`. A human audit of answer correctness has not been done
+# yet; add its findings here with the same format.
+- id: conv-26/q30
+  reason: no evidence turns listed
+- id: conv-26/q46
+  reason: no evidence turns listed
+- id: conv-26/q167
+  reason: adversarial item also has a gold answer that contradicts its adversarial_answer
+- id: conv-26/q178
+  reason: adversarial item also has a gold answer that contradicts its adversarial_answer
+- id: conv-42/q58
+  reason: evidence D10:19 is not a turn of the conversation
+- id: conv-42/q88
+  reason: evidence entry "D" is not a dialogue id
+- id: conv-47/q38
+  reason: evidence D4:36 is not a turn of the conversation
+- id: conv-50/q39
+  reason: no evidence turns listed
+- id: conv-50/q42
+  reason: no evidence turns listed

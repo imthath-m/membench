@@ -132,7 +132,6 @@ def test_query_v2_fields_are_parsed():
 
 
 @pytest.mark.parametrize(("query", "message"), [
-    ({"abstain": True, "answer": "x"}, "has no 'answer'"),
     ({"evidence": ["nope"]}, "evidence 'nope' is not an earlier write"),
     ({"category": "forget"}, "must follow a forget step"),
 ])

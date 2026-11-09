@@ -121,8 +121,11 @@ def build_manifest(
             "deployment": adapter.deployment,
             "region": adapter.config.get("region"),
         },
-        "pack": {"name": pack.name, "sha256": pack.sha256},
-        "dataset": None,  # {id, revision, sha256} once dataset loaders exist (Phase 12)
+        "pack": {
+            "name": pack.name, "sha256": pack.sha256, "subset": pack.subset,
+            "qa_style": pack.qa_style,
+        },
+        "dataset": pack.dataset,  # how membench.datasets built it (None: a YAML pack)
         "judge": judge_info,
         "reader": reader_info,
         "tokenizer": getattr(tokenizer, "name", None) or _name(tokenizer),

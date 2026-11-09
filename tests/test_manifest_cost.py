@@ -40,7 +40,10 @@ def test_manifest_records_inputs():
     result = run_pack(pack, adapter, "full-context", judge=StubJudge("x"), seed=7, repeat=2)
     manifest = result.manifest
 
-    assert manifest["pack"] == {"name": "mini", "sha256": pack.sha256}
+    assert manifest["pack"] == {
+        "name": "mini", "sha256": pack.sha256, "subset": None, "qa_style": "membench",
+    }
+    assert manifest["dataset"] is None
     assert manifest["backend"]["config"]["api_key"] == "<redacted>"
     assert manifest["backend"]["region"] == "eu-west-1"
     assert manifest["judge"] == {
