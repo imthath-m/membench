@@ -51,6 +51,9 @@ membench = "membench.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["membench"]
 
+[tool.hatch.build.targets.sdist]
+exclude = ["results"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

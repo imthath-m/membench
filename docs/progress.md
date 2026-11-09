@@ -210,14 +210,14 @@ Status: done (with blocked items)
 
 ## Phase 16 — Results publishing + scheduled CI
 Status: in progress
-- [ ] `membench publish`: `results/<YYYY-MM-DD>/<dataset>/<backend>/` with `report.json`, the report's judge-cache entries, `uv.lock` hash
-- [ ] Offline baseline results committed (full-context, bm25, chroma, oracle on synthetic packs; no judge)
-- [ ] `membench leaderboard results/ --out results/README.md` (CI, n, cost per 1k queries, recall p95; grouped by judge model + prompt version; judge status; oracle = upper bound; default vs vendor-tuned rows)
-- [ ] `membench report --failures` (not retrieved / stale surfaced / answered wrong / false abstention / forget violation; excerpt + evidence ids)
-- [ ] Comparison write-up draft (offline baselines; Mem0 + Phase 14 rows pending), every number linked
-- [ ] CI: per-PR offline rescore of `results/` (strict cache) + leaderboard re-derive diff
-- [ ] CI: nightly secret-gated smoke (opens issue on failure) + weekly canary on latest unpinned deps
-- [ ] CI: full benchmark runs manual dispatch only
-- [ ] PyPI v0.2 release prep (metadata, tag/manual-gated trusted-publishing workflow; not published)
-- [ ] README docs + tests
+- [x] `membench publish`: `results/<YYYY-MM-DD>/<dataset>/<backend>/` with `report.json`, the report's judge-cache entries, `uv.lock` hash
+- [x] Offline baseline results committed (full-context, bm25, chroma, oracle on synthetic packs; no judge)
+- [x] `membench leaderboard results/ --out results/README.md` (CI, n, cost per 1k queries, recall p95; grouped by judge model + prompt version; judge status; oracle = upper bound; default vs vendor-tuned rows)
+- [x] `membench report --failures` (not retrieved / stale surfaced / answered wrong / false abstention / forget violation; excerpt + evidence ids)
+- [x] Comparison write-up draft (offline baselines; Mem0 + Phase 14 rows pending), every number linked
+- [x] CI: per-PR offline rescore of `results/` (strict cache) + leaderboard re-derive diff
+- [x] CI: nightly secret-gated smoke (opens issue on failure) + weekly canary on latest unpinned deps
+- [x] CI: full benchmark runs manual dispatch only
+- [x] PyPI v0.2 release prep (metadata, tag/manual-gated trusted-publishing workflow; not published)
+- [x] README docs + tests
 - [ ] "Overall status" checklist of blocked items (Phases 8–16) at the top of this file

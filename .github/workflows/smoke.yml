@@ -1,0 +1,111 @@
+name: Smoke
+
+# Scheduled, secret-gated smoke run: the `mini` pack on each live backend with the
+# judge on, to catch SDK and API drift. Nightly installs the frozen uv.lock; the
+# weekly canary installs the latest unpinned dependencies instead. A backend whose
+# secrets are not set is skipped (not failed). Any failure opens (or comments on)
+# one issue per mode. Needs repository secrets MEMBENCH_JUDGE_API_KEY, OPENAI_API_KEY
+# and, per hosted backend, MEM0_API_KEY / ZEP_API_KEY / LETTA_API_KEY.
+on:
+  schedule:
+    - cron: "17 3 * * *"   # nightly
+    - cron: "41 4 * * 1"   # weekly canary (Mondays)
+  workflow_dispatch:
+    inputs:
+      deps:
+        description: "locked = frozen uv.lock (nightly); latest = unpinned (canary)"
+        type: choice
+        default: locked
+        options: [locked, latest]
+
+permissions:
+  contents: read
+
+env:
+  DEPS: ${{ github.event.schedule == '41 4 * * 1' && 'latest' || inputs.deps || 'locked' }}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [mem0, mem0-platform, zep, letta, letta-agent, langmem, cognee]
+    env:
+      BACKEND: ${{ matrix.backend }}
+      MEMBENCH_JUDGE_API_KEY: ${{ secrets.MEMBENCH_JUDGE_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LLM_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # Cognee's LLM / embedder key
+      MEM0_API_KEY: ${{ secrets.MEM0_API_KEY }}
+      ZEP_API_KEY: ${{ secrets.ZEP_API_KEY }}
+      LETTA_API_KEY: ${{ secrets.LETTA_API_KEY }}
+    steps:
+      - name: Check secrets
+        id: secrets
+        run: |
+          case "$BACKEND" in
+            mem0|langmem|cognee) need="OPENAI_API_KEY" ;;
+            mem0-platform) need="MEM0_API_KEY" ;;
+            zep) need="ZEP_API_KEY" ;;
+            letta|letta-agent) need="LETTA_API_KEY" ;;
+          esac
+          for key in MEMBENCH_JUDGE_API_KEY $need; do
+            if [ -z "${!key}" ]; then
+              echo "::notice::$key is not set; skipping the $BACKEND smoke run."
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+
+      - name: Set up Python
+        if: steps.secrets.outputs.ready == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install membench (${{ env.DEPS }} dependencies)
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          extra="${BACKEND%-agent}"  # letta-agent ships in the letta extra
+          if [ "$DEPS" = latest ]; then
+            pip install --upgrade -e ".[$extra,tokens]"
+          else
+            pip install uv
+            uv sync --frozen --extra "$extra" --extra tokens
+            echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Smoke run (mini, judge on)
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          membench run --backend "$BACKEND" --pack mini --judge --repeats 1 --out smoke.json
+          membench rescore --in smoke.json --check
+          python -c "import json, sys; r = json.load(open('smoke.json')); \
+            sys.exit(0 if r['valid'] and r['scores']['semantic_recall'] is not None else \
+            'invalid run or no judge verdicts')"
+
+  report-failure:
+    needs: smoke
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$DEPS" = latest ]; then title="Weekly canary failed (latest dependencies)"
+          else title="Nightly smoke run failed"; fi
+          body="Smoke run failed: $RUN_URL"
+          number=$(gh issue list --state open --search "in:title \"$title\"" \
+            --json number --jq '.[0].number')
+          if [ -n "$number" ]; then gh issue comment "$number" --body "$body"
+          else gh issue create --title "$title" --body "$body"; fi

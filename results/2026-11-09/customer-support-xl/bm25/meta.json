@@ -1,0 +1,7 @@
+{
+  "config": "default",
+  "uv_lock_sha256": "d2d0dcd123cd73fc15b631c5fca1c0adb7c8c19d75bf4f908b6b955ad88019fe",
+  "trimmed": [
+    "traces[].detail.items[].text"
+  ]
+}
