@@ -5,7 +5,7 @@ Resume protocol: list origin branches `claude/gracious-edison-v8eyxs*`; open the
 |---|---|---|---|
 | 8 | claude/gracious-edison-v8eyxs | #6 | done (live run blocked) |
 | 9 | claude/gracious-edison-v8eyxs-phase-9 | #7 | done |
-| 10 | claude/gracious-edison-v8eyxs-phase-10 | — | in progress |
+| 10 | claude/gracious-edison-v8eyxs-phase-10 | — | done (cost-vs-dashboard blocked) |
 
 ## Phase 8 — Hardening + first live run
 Status: done (with blocked items)
@@ -53,7 +53,7 @@ Status: done
   - Chroma still scores 1.0 `update_correctness` on the bundled packs at `top_k=3` (both values are surfaced), now earned; the Phase 11 staleness metric is what penalises that.
 
 ## Phase 10 — Reproducibility + cost accounting
-Status: in progress
+Status: done (with blocked items)
 - [x] Run manifest in every report (schema_version, membench version + git commit/dirty, Python/OS, backend SDK versions, redacted backend config, pack name + sha256, dataset slot, judge/reader/backend models + base URLs, judge prompt version, tokenizer, seed, repeat index, deployment, start/finish)
 - [ ] `JUDGE_PROMPT_VERSION` in manifest + cache key; cache stores raw response + `usage`
 - [x] Judge `--strict-cache` (cache miss is an error)
@@ -63,3 +63,12 @@ Status: in progress
 - [x] Determinism: seed, embedding model id + temperature recorded; non-determinism documented
 - [x] Committed JSON Schema; every report validates (test)
 - [x] CI test: `rescore` on a committed report reproduces identical scores offline
+- Blocked: "cost section matches the provider dashboard within 5%" — needs a live run (`OPENAI_API_KEY` for Mem0, `MEMBENCH_JUDGE_API_KEY`). Once the secrets exist: `gh workflow run live.yml -f pack=customer-support`, then compare `live-report.json` `cost.backend` / `cost.judge` token counts and USD against the OpenAI and Anthropic usage dashboards for that window. Before that, re-verify the OpenAI rows in `membench/prices.yaml` (Claude rows were checked 2026-10-06; OpenAI rows were not checked against the live pricing page here).
+- Notes for next phases:
+  - Report = `asdict(RunResult)` + new `manifest` (see `core/manifest.py`, `REPORT_SCHEMA_VERSION = "1"`) and `cost` (`core/cost.py`). `membench/report.schema.json` has `additionalProperties: false` at the top level, on traces, the manifest and cost: a new report field needs a schema edit (and a `REPORT_SCHEMA_VERSION` bump if breaking), then `python tests/fixtures/make_report.py` to regenerate the committed fixture (`tests/fixtures/report_customer_support.json` + `judge_cache_customer_support.json`). New score keys are allowed (number|null) without a schema edit.
+  - Manifest slots left `null` for later phases: `dataset` ({id, revision, sha256}, Phase 12), `reader` ({model, base_url}, Phase 11), `cost.reader` (Phase 11). Tokenizer is recorded as the callable's dotted name (`membench.core.tokens.count_tokens`); Phase 11 should pass a named tokenizer.
+  - Adapter contract additions (non-breaking): class attrs `packages` (SDK dists → `manifest.packages`), `deployment` ("local"/"hosted"; region from `config["region"]`); optional `describe()` → `manifest.backend.models` (keys `llm_model`, `llm_base_url`, `temperature`, `embedding_model`). `usage()` keys are `llm_input_tokens`, `llm_output_tokens`, `embedding_tokens`; `core/usage.py:meter_openai(client, totals)` wraps an `openai.OpenAI` client's chat/embedding `create`. Mem0 adapter is now 93 lines (budget 100).
+  - Pack `sha256` = sha256 of canonical JSON of the parsed YAML mapping (`Pack.sha256`, set by `parse_pack`). `rescore` resolves the pack from `--pack` or the manifest's pack name (builtin) and refuses a sha mismatch; dataset-backed packs (Phase 12) will need `--pack` or a loader hook there.
+  - Judge: `JUDGE_PROMPT_VERSION = "1"` is in the cache key (`{model}:v1:{sha}`), so pre-Phase-10 caches are all misses. Clients have `respond(prompt) -> (text, {input_tokens, output_tokens})`; `CachedJudge` needs a client with `respond` (or `client=None` with `strict=True`). Cache entries: `{passed, reason, raw, usage}` or `{error, raw, usage}` — judge failures are now cached (changed from Phase 8) so a strict replay reproduces them; a non-strict run still re-asks the client. `CacheMissError` is not a `JudgeError`: it stops the run/rescore (CLI exit 1). `CachedJudge.usage` = {calls, cache_hits, input_tokens, output_tokens} for this run; cost counts fresh calls only (cached replay = $0).
+  - `run_pack(..., seed=0, repeat=0)`; CLI `--seed`, `--repeat-index`, `--strict-cache`. Seeding = `random.seed` + numpy if already imported. Phase 13 repeats should pass `repeat`.
+  - `uv.lock` (uv 0.11) covers all extras; CI `lock` job runs `uv lock --check`; `live.yml` installs via `uv sync --frozen --extra mem0` and runs `membench rescore --check` after the run. Run `uv lock` after any `pyproject.toml` dependency change.
