@@ -43,11 +43,13 @@ def length_bucket(tokens: int) -> str:
     return next(name for bound, name in LENGTH_BUCKETS if bound is None or tokens < bound)
 
 
-def item_prompt(item: dict) -> tuple[str, Callable[[str], Verdict]]:
-    """The exact prompt a judge gets for an item, and its reply parser."""
+def item_prompt(item: dict, version: str | None = None
+                ) -> tuple[str, Callable[[str], Verdict]]:
+    """The exact prompt a judge gets for an item, and its reply parser. Official
+    templates (LongMemEval) are fixed: `version` does not change them."""
     if item.get("prompt"):  # an official template (LongMemEval), yes/no reply
         return item["prompt"], parse_yes_no
-    return build_prompt(item["rubric"], item["evidence"]), parse_verdict
+    return build_prompt(item["rubric"], item["evidence"], version), parse_verdict
 
 
 class _Recorder:

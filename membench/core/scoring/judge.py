@@ -73,8 +73,7 @@ def record_judge_error(detail: dict[str, Any], metric: str, exc: JudgeError) -> 
     detail.setdefault("judge_error", {})[metric] = str(exc)
 
 
-def build_prompt(rubric: str, evidence: str) -> str:
-    """Deterministic structured prompt shared by every client and the cache key."""
+def _build_prompt_v1(rubric: str, evidence: str) -> str:
     return (
         "You are a strict evaluator. Decide whether the STATEMENT is true of "
         "the EVIDENCE. Respond with ONLY a JSON object of the form "
@@ -82,6 +81,23 @@ def build_prompt(rubric: str, evidence: str) -> str:
         'Answer "pass" only if the EVIDENCE clearly supports the STATEMENT.\n\n'
         f"STATEMENT:\n{rubric}\n\nEVIDENCE:\n{evidence}\n"
     )
+
+
+# Prompt text per version. The default (`JUDGE_PROMPT_VERSION`) scores runs; other
+# versions are candidates for `judge-tune`. Add one entry per new version.
+PROMPT_BUILDERS: dict[str, Callable[[str, str], str]] = {"1": _build_prompt_v1}
+
+
+def build_prompt(rubric: str, evidence: str, version: str | None = None) -> str:
+    """Deterministic structured prompt shared by every client and the cache key
+    (`version` defaults to `JUDGE_PROMPT_VERSION`)."""
+    version = version or JUDGE_PROMPT_VERSION
+    try:
+        builder = PROMPT_BUILDERS[version]
+    except KeyError:
+        raise ValueError(f"unknown judge prompt version {version!r}; known: "
+                         f"{', '.join(sorted(PROMPT_BUILDERS))}") from None
+    return builder(rubric, evidence)
 
 
 def parse_verdict(text: str) -> Verdict:
@@ -228,9 +244,10 @@ class JudgeCache:
             self._data = json.loads(self.path.read_text())
 
     @staticmethod
-    def key(model: str, prompt: str) -> str:
-        digest = hashlib.sha256(f"{model}\n{JUDGE_PROMPT_VERSION}\n{prompt}".encode()).hexdigest()
-        return f"{model}:v{JUDGE_PROMPT_VERSION}:{digest}"
+    def key(model: str, prompt: str, version: str | None = None) -> str:
+        version = version or JUDGE_PROMPT_VERSION
+        digest = hashlib.sha256(f"{model}\n{version}\n{prompt}".encode()).hexdigest()
+        return f"{model}:v{version}:{digest}"
 
     def get(self, key: str) -> dict | None:
         return self._data.get(key)
@@ -261,7 +278,10 @@ class CachedJudge:
         strict: bool = False,
         model: str | None = None,
         base_url: str | None = None,
+        prompt_version: str | None = None,
     ) -> None:
+        self.prompt_version = prompt_version or JUDGE_PROMPT_VERSION
+        build_prompt("", "", self.prompt_version)  # fail fast on an unknown version
         self.client = client
         self.model = model or client.model
         self.base_url = base_url or getattr(client, "base_url", None)
@@ -270,11 +290,11 @@ class CachedJudge:
         self.usage = {"calls": 0, "cache_hits": 0, "input_tokens": 0, "output_tokens": 0}
 
     def score(self, rubric: str, evidence: str) -> Verdict:
-        return self.ask(build_prompt(rubric, evidence))
+        return self.ask(build_prompt(rubric, evidence, self.prompt_version))
 
     def ask(self, prompt: str, parse: Callable[[str], Verdict] = parse_verdict) -> Verdict:
         """Judge a ready-made prompt (e.g. an official benchmark template)."""
-        key = JudgeCache.key(self.model, prompt)
+        key = JudgeCache.key(self.model, prompt, self.prompt_version)
         entry = self.cache.get(key)
         if entry is not None and (self.strict or "error" not in entry):
             self.usage["cache_hits"] += 1
@@ -339,6 +359,7 @@ def build_judge(
     api_key: str | None = None,
     cache_path: str | Path,
     strict: bool = False,
+    prompt_version: str | None = None,
 ) -> CachedJudge | None:
     """Construct a cached judge, or return None when no API key is available.
 
@@ -348,9 +369,9 @@ def build_judge(
     if strict:
         return CachedJudge(
             None, cache_path, strict=True, model=model or DEFAULT_JUDGE_MODEL,
-            base_url=base_url,
+            base_url=base_url, prompt_version=prompt_version,
         )
     client = resolve_client(model=model, base_url=base_url, api_key=api_key)
     if client is None:
         return None
-    return CachedJudge(client, cache_path)
+    return CachedJudge(client, cache_path, prompt_version=prompt_version)
