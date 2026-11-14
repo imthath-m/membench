@@ -83,9 +83,53 @@ def _build_prompt_v1(rubric: str, evidence: str) -> str:
     )
 
 
+# CANDIDATE v2 — an UNTESTED hypothesis: never run against any model, no agreement
+# numbers exist for it, and it is not the default (`JUDGE_PROMPT_VERSION` stays "1").
+# Do not edit this text once any v2 result exists; write a v3 instead. Each rule
+# targets a documented failure mode (docs/prompt-tuning.md, "Prompt v2"):
+#   - every part / guessing / wording / near-miss / hedge: partial matches
+#     (labelling-guidelines.md "Clearly", "Wording", qa_accuracy hedge rule);
+#   - amount of evidence: length bias (judge-validation.md "by-length breakdown";
+#     labelling-guidelines.md "Do not reward length");
+#   - declines / does not know: abstention (labelling-guidelines.md qa_accuracy);
+#   - marked as replaced: superseded values (labelling-guidelines.md semantic_recall
+#     and contradiction_rate), phrased so a marked update is not a conflict and
+#     unmarked conflicting values stay unresolved — consistent with both rubrics;
+#   - reason (quoted span) before verdict: evidence-first, against unsupported passes.
+# No few-shot examples: examples from validation/sample.jsonl would leak labelled items.
+def _build_prompt_v2(rubric: str, evidence: str) -> str:
+    return (
+        "You are a strict evaluator. Decide only whether the STATEMENT is true of "
+        "the EVIDENCE. Use no outside knowledge.\n"
+        "Rules:\n"
+        "- Pass only if the EVIDENCE clearly supports every part of the STATEMENT. "
+        "If you must guess or assume, fail.\n"
+        "- Wording and format may differ (paraphrases, synonyms, \"3 hours\" vs "
+        "\"three hours\").\n"
+        "- Topical overlap, a near-miss value, or a hedge between a right and a wrong "
+        "answer is not support: fail.\n"
+        "- The amount of EVIDENCE is not support. Long EVIDENCE passes only if it "
+        "contains the specific support; short EVIDENCE that states it passes.\n"
+        "- EVIDENCE that declines or says it does not know does not support a STATEMENT "
+        "that needs a specific answer; it does support a STATEMENT that the answer is "
+        "unknown or unavailable.\n"
+        "- If the EVIDENCE gives different values for the same thing, a value it clearly "
+        "marks as replaced (a later date, \"changed to\", \"now\", \"instead\") is an old "
+        "value, not a conflict; unmarked conflicting values leave it unclear which one "
+        "holds.\n"
+        "First find the shortest EVIDENCE span that decides the STATEMENT. Respond with "
+        "ONLY a JSON object of the form "
+        '{"reason": "<that span, quoted, or what is missing>", "verdict": "pass" | "fail"}.'
+        f"\n\nSTATEMENT:\n{rubric}\n\nEVIDENCE:\n{evidence}\n"
+    )
+
+
 # Prompt text per version. The default (`JUDGE_PROMPT_VERSION`) scores runs; other
 # versions are candidates for `judge-tune`. Add one entry per new version.
-PROMPT_BUILDERS: dict[str, Callable[[str, str], str]] = {"1": _build_prompt_v1}
+PROMPT_BUILDERS: dict[str, Callable[[str, str], str]] = {
+    "1": _build_prompt_v1,
+    "2": _build_prompt_v2,  # candidate, untested (see above)
+}
 
 
 def build_prompt(rubric: str, evidence: str, version: str | None = None) -> str:
