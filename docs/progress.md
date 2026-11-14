@@ -17,6 +17,7 @@ All code, tests, workflows and docs are in. What is left needs keys, people or a
 - [ ] **P14 vendor review (manual):** open the 5 issues drafted in `docs/vendor-review.md`; put vendor-tuned configs in `configs/vendor-tuned/<backend>.yaml` when they reply, then run with `-f config=vendor-tuned`.
 - [ ] **P15 human labels:** 2 annotators + adjudication on `validation/sample.jsonl` (docs/labelling-guidelines.md) → `membench judge-labels --annotator a=a.jsonl --annotator b=b.jsonl [--adjudication adj.jsonl]`.
 - [ ] **P15 cross-judge + agreement:** `gh workflow run judge-validation.yml` (`MEMBENCH_JUDGE_API_KEY`, `OPENAI_API_KEY`, `TOGETHER_API_KEY`); commit `validation/` outputs; update `test_no_committed_validation_result_means_unvalidated`.
+- [ ] **Judge prompt tuning:** after human labels (`membench judge-label` per annotator), `MEMBENCH_JUDGE_API_KEY=… membench judge-tune --prompt-version 1 --prompt-version 2`; decide on candidate v2 (docs/prompt-tuning.md).
 - [ ] **P15 qa_accuracy items:** reader runs (`--reader-model`) per backend on synthetic packs, re-run `membench judge-sample`, label the new items.
 - [ ] **P16 live result rows:** `gh workflow run live.yml -f backend=mem0 -f pack=tool-call-memory` and `-f backend=all -f pack=tool-call-memory` (repeat for `customer-support-xl`); download each job's `results/` artifact, commit it, `membench leaderboard results/ --out results/README.md`; add the rows to `docs/comparison.md` and publish it (Done-when 2).
 - [ ] **P16 nightly smoke green 7 days:** after merge + secrets, `smoke.yml` runs nightly by itself; watch for 7 green nights (failures open an issue). Do not dispatch from here.
@@ -272,3 +273,19 @@ Status: done
   - Matching decision: `expect_absent` checks (`contains_any`: staleness, forget compliance) match whole words/phrases: case-insensitive, needle regex-escaped, `(?<!\w)needle(?!\w)` so punctuation-edged needles (`$49.99`, `C++`) still match. `expect_contains` checks (recall precision, update correctness, temporal accuracy) stay plain substrings: both choices err toward not penalising a backend (a stale value inside another word is no leak; an inflection like "tickets" still counts as a hit). Switching `expect_contains` too would change no committed result (checked), so it is a policy choice, not a data one. `report --failures` excerpts still centre on the first substring hit (display only).
   - Version decision: the manifest has no scoring/metric version (only report schema, judge prompt, reader prompt, generator versions); none of those describe this change, so nothing was bumped. Package stays 0.2.0 (unreleased). Effect: a report scored before this change fails `membench rescore --check` on staleness / forget compliance until re-scored (`rescore --out`, then `publish`).
   - Score changes: only `results/2026-11-09/customer-support-xl/full-context` moved: forget compliance 91.7% [78–97%] → 100% [90–100%] (steps 98, 428, 1055: forgotten `Pro` matched "approved"/"problem"). The other 7 committed results and the test fixture re-score identically; `make_report.py` was re-run and differed only in latencies, so the committed fixture was kept. Re-published with `membench rescore --in <report> --out new.json` → `membench publish --in new.json --judge-cache <dir>/judge_cache.json`; `results/README.md` re-derived; `docs/comparison.md` updated.
+
+## Judge labelling tool + prompt tuning
+Status: done (labels + live tuning blocked)
+PR: #17
+- [x] `membench judge-label`: blind local browser labelling page, one annotator per run, saves each label immediately (`membench/core/validation/label_server.py`, `tests/test_judge_label.py`)
+- [x] Prompt-version registry: `PROMPT_BUILDERS`, `build_prompt(..., version)`, version in `JudgeCache.key` / `CachedJudge(prompt_version=)`; v1 text, default and cache keys unchanged
+- [x] `membench judge-tune`: seeded dev / held-out split stratified by metric; agreement per version × split × metric × length bucket; deltas; dev-only disagreements (`membench/core/validation/tune.py`, `tests/test_judge_tune.py`)
+- [x] Candidate prompt v2 (`PROMPT_BUILDERS["2"]`), not the default; text pinned by `tests/test_judge_prompt_v2.py`. Untested hypothesis: never run against a model
+- [x] Docs: `docs/prompt-tuning.md`, `docs/WALKTHROUGH.md`; pointers in `docs/judge-validation.md`, README
+- [x] Tests (synthetic data only)
+- [ ] Collect human labels (2 annotators, `membench judge-label`, then `judge-labels` + adjudication) — Blocked: needs people.
+- [ ] Run `membench judge-tune --prompt-version 1 --prompt-version 2` live — Blocked: needs labels + `MEMBENCH_JUDGE_API_KEY` (up to 800 judge calls on the first run).
+- [ ] Decide on v2 (proposed rule in docs/prompt-tuning.md; promoting = bump `JUDGE_PROMPT_VERSION`, update pinned hash, re-run judge-cross / judge-agreement, re-score) — Blocked on the run above.
+- Notes:
+  - v2 adds: length-bias, partial-match, abstention and superseded-value rules, and asks for the quoted deciding span in `reason` before `verdict`. No few-shot examples (would leak labelled items).
+  - Not run: no labels, no `validation/tuning-v2.json`, no API calls, no agreement numbers for v1 or v2.

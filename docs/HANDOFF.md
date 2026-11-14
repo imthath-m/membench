@@ -100,7 +100,8 @@ Do these in order. Each closes a checkbox in [progress.md](progress.md) "Overall
     - Add the rows to [comparison.md](comparison.md) (every number linked to its `report.json`), drop "draft", open a PR. Closes "P16 live result rows" + Phase 16 "write-up published".
 15. **P16 nightly smoke 7 days:** after steps 1–2, `smoke.yml` runs by itself at 03:17 UTC; watch for 7 consecutive green nights (failures open an issue "Nightly smoke run failed"). Don't dispatch it to count. Closes Phase 16 Done-when 1.
 16. **P16 PyPI v0.2.0 (user):** PyPI setup above, then from `main`: `git tag v0.2.0 && git push origin v0.2.0`; approve the `pypi` environment. Expect `pip install membench==0.2.0` to work. Then update the README "Install" section. Closes "P16 PyPI".
-17. **Optional:** BEAM / MemoryAgentBench loaders (Phase 12 deferred).
+17. **Judge prompt tuning (needs step 11's labels + `MEMBENCH_JUDGE_API_KEY`):** annotators label with `membench judge-label --annotator NAME` (each separately), merge with `membench judge-labels`; then `membench judge-tune --prompt-version 1 --prompt-version 2` → `validation/tuning-v2.json` / `.md` (up to 800 judge calls first run; `--strict` replays). Decide on candidate v2 per [prompt-tuning.md](prompt-tuning.md) (held-out once). Closes "Judge labelling tool + prompt tuning" open items.
+18. **Optional:** BEAM / MemoryAgentBench loaders (Phase 12 deferred).
 
 ## Known limitations / caveats
 

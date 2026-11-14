@@ -18,7 +18,8 @@ metric is shown as `unvalidated` in reports.
    bucket), so small strata (e.g. long contexts) are fully covered.
 3. **Label.** Two annotators label every item on their own, following
    [labelling-guidelines.md](labelling-guidelines.md). They must not see the
-   judge's verdict, or each other's labels.
+   judge's verdict, or each other's labels. `membench judge-label --annotator
+   NAME` serves a blind labelling page and writes `validation/annotations/NAME.jsonl`.
 4. **Merge + adjudicate.** `membench judge-labels --annotator a=a.jsonl
    --annotator b=b.jsonl --out validation/labels.jsonl` merges the two and
    prints how many items disagree. A third person adjudicates them
@@ -105,6 +106,8 @@ CC BY-NC) is never committed.
   the LongMemEval judge templates) bumps `JUDGE_PROMPT_VERSION` in
   `membench/core/scoring/judge.py`. `tests/test_judge_validation.py` pins a hash
   of the prompts per version and fails until the bump and the new hash are in.
+- To compare a candidate prompt with the current one on labelled items before
+  bumping, see [prompt-tuning.md](prompt-tuning.md) (`membench judge-tune`).
 - The bump changes the judge cache key and the run manifest, so verdicts of
   different prompt versions never mix, and `compare` refuses to pair them.
 - After a bump, re-run steps 5–6 on the same labelled items (item ids don't
