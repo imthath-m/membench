@@ -46,6 +46,7 @@ from membench.core.validation.cross import (
     run_judges,
     share_cache,
 )
+from membench.core.validation.label_server import LabelStore, make_server
 from membench.core.validation.labels import (
     gold,
     load_labels,
@@ -625,6 +626,42 @@ def convert(
 
 
 _VALIDATION = Path("validation")
+
+
+@app.command(name="judge-label")
+def judge_label(
+    annotator: str = typer.Option(..., "--annotator", help="Your annotator name."),
+    sample: Path = typer.Option(_VALIDATION / "sample.jsonl", "--sample", help="Sample JSONL."),
+    out: Path = typer.Option(
+        None, "--out", help="Your annotator JSONL (default validation/annotations/NAME.jsonl)."
+    ),
+    metric: list[str] = typer.Option(None, "--metric", help="Only label this metric (repeat)."),
+    seed: int = typer.Option(0, "--seed", help="Shuffle seed (combined with --annotator)."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address."),
+    port: int = typer.Option(8765, "--port", help="Port (0 = any free port)."),
+    no_open: bool = typer.Option(False, "--no-open", help="Don't open a browser."),
+) -> None:
+    """Label judge items blind in a local browser page; saves every label immediately."""
+    out = out or _VALIDATION / "annotations" / f"{annotator}.jsonl"
+    try:
+        store = LabelStore(read_jsonl(sample), annotator, out, metric or None, seed)
+        server = make_server(store, host, port)
+    except (ValueError, OSError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    url = f"http://{host}:{server.server_address[1]}/"
+    typer.echo(f"Labelling {len(store.items)} items as {annotator!r} ({len(store.labels)} done); "
+               f"saving to {out}\nOpen {url}  (Ctrl-C to stop)")
+    if not no_open:
+        import webbrowser
+
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        typer.echo(f"\nStopped. {len(store.labels)} labels in {out}")
+    finally:
+        server.server_close()
 
 
 @app.command(name="judge-sample")
