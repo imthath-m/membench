@@ -31,6 +31,7 @@ from membench.core.scoring.judge import (
     API_KEY_ENV,
     DEFAULT_JUDGE_MODEL,
     JUDGE_PROMPT_VERSION,
+    PROMPT_BUILDERS,
     CacheMissError,
     JudgeCache,
     build_judge,
@@ -61,6 +62,13 @@ from membench.core.validation.sample import (
     stratified_sample,
 )
 from membench.core.validation.status import agreement_path
+from membench.core.validation.tune import (
+    build_version_judges,
+    join_sample,
+    render_tuning_markdown,
+    run_versions,
+    tuning_report,
+)
 from membench.datasets import DATASETS, SYNTHETIC, resolve_pack, select_queries
 from membench.generate.generator import GenerationError, generate_pack
 from membench.generate.synthetic import paraphrase_queries
@@ -802,6 +810,75 @@ def judge_agreement(
     for name, info in sorted(result["judges"].items()):
         for metric, m in info["metrics"].items():
             typer.echo(f"  {name} {metric}: kappa {m['kappa']} n={m['n']} {m['status']}")
+
+
+@app.command(name="judge-tune")
+def judge_tune(
+    labels: Path = typer.Option(_VALIDATION / "labels.jsonl", "--labels",
+                                help="Human labels JSONL."),
+    sample: Path = typer.Option(_VALIDATION / "sample.jsonl", "--sample", help="Sample JSONL."),
+    prompt_version: list[str] = typer.Option(
+        ..., "--prompt-version", help="Judge prompt version (repeat; first = baseline, "
+        "last = candidate)."
+    ),
+    seed: int = typer.Option(0, "--seed", help="Dev / held-out split seed."),
+    held_out: float = typer.Option(0.5, "--held-out", help="Held-out fraction per metric."),
+    judge_model: str = typer.Option(DEFAULT_JUDGE_MODEL, "--judge-model", help="Judge model."),
+    judge_base_url: str = typer.Option(None, "--judge-base-url",
+                                       help="OpenAI-compatible base URL."),
+    judge_cache: Path = typer.Option(_VALIDATION / "judge_cache.json", "--judge-cache",
+                                     help="Judge cache (shared by all versions)."),
+    strict: bool = typer.Option(False, "--strict/--no-strict",
+                                help="Cached verdicts only, no API calls."),
+    out: Path = typer.Option(None, "--out", help="Tuning JSON (default validation/tuning-v"
+                             "<candidate>.json); a Markdown copy is written next to it."),
+) -> None:
+    """Compare judge prompt versions against human labels on a dev / held-out split."""
+    versions = list(dict.fromkeys(prompt_version))
+    unknown = [v for v in versions if v not in PROMPT_BUILDERS]
+    if unknown or len(versions) < 2:
+        problem = (f"unknown prompt version(s) {', '.join(unknown)}" if unknown
+                   else "give at least two distinct --prompt-version values")
+        typer.echo(f"Error: {problem} (known: {', '.join(sorted(PROMPT_BUILDERS))})", err=True)
+        raise typer.Exit(code=1)
+    if not 0 <= held_out <= 1:
+        typer.echo(f"Error: --held-out must be in [0, 1], got {held_out}", err=True)
+        raise typer.Exit(code=1)
+    if not strict and resolve_client(model=judge_model, base_url=judge_base_url) is None:
+        typer.echo(f"No ${API_KEY_ENV}: using cached verdicts only (as --strict).")
+        strict = True
+    try:
+        label_lines = load_labels(labels)
+        items = join_sample(label_lines, read_jsonl(sample))
+        judges = build_version_judges(versions, judge_cache, strict=strict, model=judge_model,
+                                      base_url=judge_base_url)
+        verdicts, misses = run_versions(items, judges)
+    except (ValueError, KeyError, OSError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    if misses:
+        for v, ids in misses.items():
+            typer.echo(f"Error: v{v} lacks cached verdicts for {len(ids)} items (first: "
+                       f"{', '.join(ids[:5])})", err=True)
+        typer.echo(f"Set ${API_KEY_ENV} (without --strict) to judge them.", err=True)
+        raise typer.Exit(code=1)
+    report_data = tuning_report(label_lines, items, verdicts, seed=seed,
+                                held_out_fraction=held_out, judge_model=judge_model,
+                                base_url=judge_base_url,
+                                usage={v: j.usage for v, j in judges.items()})
+    out = out or _VALIDATION / f"tuning-v{report_data['candidate']}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report_data, indent=2) + "\n")
+    out.with_suffix(".md").write_text(render_tuning_markdown(report_data))
+    typer.echo(f"Wrote judge tuning ({len(versions)} versions, {report_data['n_items']} items) "
+               f"to {out}")
+    for v in versions:
+        m = report_data["results"][v]["dev"]["overall"]
+        typer.echo(f"  v{v} dev: kappa {m['kappa']} accuracy {m['accuracy']} n={m['n']} "
+                   f"errors={m['errors']}")
+    typer.echo(f"  held-out delta kappa (v{report_data['candidate']} - "
+               f"v{report_data['baseline']}): "
+               f"{report_data['deltas']['held_out']['overall']['kappa']}")
 
 
 @app.command(name="list")
