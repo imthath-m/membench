@@ -20,7 +20,7 @@ Start here, then go deeper in [README.md](../README.md),
 
 | Path | What it is |
 |---|---|
-| `membench/cli.py` | The `membench` command (typer): `run`, `generate`, `report`, `leaderboard`, `compare`, `rescore`, `publish`, `convert`, `judge-sample`, `judge-labels`, `judge-cross`, `judge-agreement`, `list`. |
+| `membench/cli.py` | The `membench` command (typer): `run`, `generate`, `report`, `leaderboard`, `compare`, `rescore`, `publish`, `convert`, `judge-sample`, `judge-label`, `judge-labels`, `judge-cross`, `judge-agreement`, `judge-tune`, `list`. |
 | `membench/packs/` | `schema.py` (pack loader and validator) and three bundled packs: `mini`, `customer_support`, `coding_assistant`. |
 | `membench/datasets/` | Loaders for LongMemEval and LoCoMo; `resolve_pack()` turns `--pack` into a `Pack`. Also lists the synthetic pack names. |
 | `membench/generate/` | `synthetic.py` (seeded, template-based packs, no LLM), `generator.py` (LLM pack generation from transcripts, see [generate.md](generate.md)). |
@@ -35,7 +35,7 @@ Start here, then go deeper in [README.md](../README.md),
 | `configs/` | `default/<backend>.yaml` (default vendor configs), `judges.yaml` (cross-judge panel). |
 | `results/` | Committed offline baseline results, one dir per run; `results/README.md` is generated. |
 | `validation/` | `sample.jsonl`: items to label by hand. No labels or agreement file yet. |
-| `docs/` | [HANDOFF.md](HANDOFF.md), [progress.md](progress.md), [judge-validation.md](judge-validation.md), [labelling-guidelines.md](labelling-guidelines.md), [roadmap.md](roadmap.md), [comparison.md](comparison.md) (draft write-up), one page per backend. |
+| `docs/` | [HANDOFF.md](HANDOFF.md), [progress.md](progress.md), [judge-validation.md](judge-validation.md), [labelling-guidelines.md](labelling-guidelines.md), [prompt-tuning.md](prompt-tuning.md), [roadmap.md](roadmap.md), [comparison.md](comparison.md) (draft write-up), one page per backend. |
 | `tests/` | pytest suite (offline; live tests skip without `MEMBENCH_LIVE=1`). |
 | `.github/workflows/` | `ci.yml`, `live.yml`, `smoke.yml`, `judge-validation.yml`, `release.yml`. |
 
@@ -166,7 +166,11 @@ Status: **not run.**
 - Cross-judge was never run (needs `MEMBENCH_JUDGE_API_KEY`, `OPENAI_API_KEY`, `TOGETHER_API_KEY`).
 - Reports' judge metrics read `unvalidated` until `validation/agreement-v1.json` names the run's judge model as validated.
 
-Forward pointer: A browser labelling tool (`membench judge-label`) and a prompt-tuning harness (`membench judge-tune`, see docs/prompt-tuning.md) are added in the same change as this walkthrough; see those docs for commands.
+Labelling and prompt tuning ([prompt-tuning.md](prompt-tuning.md)):
+
+- `membench judge-label --annotator NAME`: blind browser labelling page on localhost; writes `validation/annotations/NAME.jsonl` (one per annotator, run separately).
+- `membench judge-tune --prompt-version 1 --prompt-version 2`: compares prompt versions against `validation/labels.jsonl` on a seeded dev / held-out split → `validation/tuning-v<candidate>.json` and `.md`. Needs `MEMBENCH_JUDGE_API_KEY` for uncached verdicts; `--strict` replays the cache only.
+- Prompt v2 (`PROMPT_BUILDERS["2"]` in `judge.py`) is an untested candidate, not the default. Not run: no labels, no tuning output, no API calls.
 
 ## 7. Demo in 5 minutes (offline, no API key)
 
@@ -250,7 +254,8 @@ Key names are from [HANDOFF.md](HANDOFF.md) "Keys & setup".
 | `rescore`, `publish` (always strict cache) | No | |
 | `run --strict-cache` | No | Replays judged runs from a cache |
 | `generate`, `convert --paraphrase-model` | Yes | `MEMBENCH_JUDGE_API_KEY` |
-| `judge-sample`, `judge-labels`, `judge-agreement` | No | (`judge-sample` needs a report; labels need people) |
+| `judge-sample`, `judge-label`, `judge-labels`, `judge-agreement` | No | (`judge-sample` needs a report; labels need people) |
+| `judge-tune` | Yes | `MEMBENCH_JUDGE_API_KEY` for uncached verdicts; `--strict` replays offline |
 | `judge-cross` | Yes | `MEMBENCH_JUDGE_API_KEY`, `OPENAI_API_KEY`, `TOGETHER_API_KEY`; `--strict-cache` replays offline |
 | LongMemEval / LoCoMo packs | No key, but a download | Cached under `~/.cache/membench` |
 | `pytest`, `ruff` | No | Live tests need `MEMBENCH_LIVE=1` |
@@ -298,6 +303,6 @@ From [HANDOFF.md](HANDOFF.md), [progress.md](progress.md), [results/README.md](.
 - **Indicative (†):** a number whose n is below the reporting minimum.
 - **Kappa (κ):** chance-corrected agreement between two raters.
 - **False pass / false fail:** judge passes what humans failed / fails what humans passed.
-- **Held-out:** data the judge prompt was not tuned on. Validation labels should be kept apart from any prompt tuning, or the agreement numbers are optimistic. (Tuning tooling is described in docs/prompt-tuning.md, which this page has not read.)
+- **Held-out:** data the judge prompt was not tuned on. Validation labels should be kept apart from any prompt tuning, or the agreement numbers are optimistic. `judge-tune` keeps a held-out split apart from tuning ([prompt-tuning.md](prompt-tuning.md)).
 - **Validated / unvalidated:** whether a committed agreement file passes the judge model on a metric. Default is unvalidated.
 - **Length bucket:** evidence size class used to look for length bias in the judge.
