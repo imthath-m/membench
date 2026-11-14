@@ -276,7 +276,7 @@ Status: done
 
 ## Judge labelling tool + prompt tuning
 Status: done (labels + live tuning blocked)
-PR: (pending)
+PR: #17
 - [x] `membench judge-label`: blind local browser labelling page, one annotator per run, saves each label immediately (`membench/core/validation/label_server.py`, `tests/test_judge_label.py`)
 - [x] Prompt-version registry: `PROMPT_BUILDERS`, `build_prompt(..., version)`, version in `JudgeCache.key` / `CachedJudge(prompt_version=)`; v1 text, default and cache keys unchanged
 - [x] `membench judge-tune`: seeded dev / held-out split stratified by metric; agreement per version × split × metric × length bucket; deltas; dev-only disagreements (`membench/core/validation/tune.py`, `tests/test_judge_tune.py`)
